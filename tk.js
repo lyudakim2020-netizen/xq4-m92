@@ -56,7 +56,7 @@
       return TPL[tpl].halls[hall].rows.map(function (r) { return { id: r.id, tpl: true, name: r.name, unit: r.unit, qty: 1, on: r.on, ov: null }; });
     }
     function fresh(keep) {
-      var s = { client: "", date: "", guests: 30, tpl: "w27", hall: "big", tariff: "wd", manual: false, menu: "p1", svcOn: true, showPrices: false, showMenu: true, mods: [], rows: null };
+      var s = { client: "", date: "", guests: 30, tpl: "w27", hall: "big", tariff: "wd", manual: false, menu: "p1", svcOn: true, showPrices: false, showMenu: true, mods: [], tb: null, rows: null };
       if (keep) { s.tpl = keep.tpl; s.hall = keep.hall; s.menu = keep.menu; s.showMenu = keep.showMenu; s.svcOn = keep.svcOn; }
       s.tariff = TPL[s.tpl].halls[s.hall].tariffs[0].id;
       s.rows = mkRows(s.tpl, s.hall);
@@ -238,6 +238,7 @@ body.tab-tk .mbar{display:none!important}
 .tkdoc .tkg{margin:8px 0 2px}
 .tkdoc td.r,.tkdoc th.r{text-align:right}
 @media (max-width:640px){
+.tkm-tbl tr.sec{display:block}
 .tk-tbl,.tk-tbl tbody{display:block;min-width:0}
 .tk-tbl thead{display:none}
 .tk-tbl tr{display:grid;grid-template-columns:1fr 1fr 1fr auto;gap:4px 8px;align-items:center;border-bottom:1px solid var(--line);padding-block:6px}
@@ -268,11 +269,15 @@ body.tab-tk .mbar{display:none!important}
 <thead><tr><th>Позиция</th><th class="r">Кол-во</th><th class="r">Цена, ₽</th><th class="r">Сумма, ₽</th><th></th></tr></thead>
 <tbody id="tkBody"></tbody></table></div>
 <div class="row"><select id="tkAddSel" aria-label="Добавить позицию" style="max-width:420px"></select><button type="button" id="tkAddBtn">+ Добавить</button></div>
-<div class="blk">
-<div class="row"><button type="button" id="tkImport">Взять замены блюд из вкладки «Банкет»</button><button type="button" id="tkImportClear">Убрать замены</button></div>
-<p class="why" id="tkModsInfo"></p>
 </div>
-</div>
+<div class="panel"><details id="tkMenuBox"><summary>Меню и замена блюд</summary>
+<p class="why" style="margin-top:10px" id="tkModsInfo"></p>
+<div class="tw"><table class="tk-tbl tkm-tbl" style="min-width:520px">
+<thead><tr><th>Блюдо</th><th class="r">На гостя</th><th class="r int">Разница, ₽</th><th></th></tr></thead>
+<tbody id="tkMenuBody"></tbody></table></div>
+<div class="row"><button type="button" class="ghost" id="tkMenuAdd">+ Добавить блюдо сверх пакета</button><button type="button" id="tkMenuReset">Вернуть меню пакета</button></div>
+<p class="note" id="tkMenuNote" hidden></p>
+</details></div>
 <div class="panel"><details id="tkPriceBox"><summary>Цены этого пакета под ключ</summary>
 <p class="why" style="margin-top:10px">Цены из ваших таблиц. Если они изменились, поправьте здесь: сохранится в этом браузере. Цена меню берётся из вкладки «Пакеты».</p>
 <div class="tw"><table id="tkPriceTbl" style="min-width:420px"></table></div>
@@ -355,7 +360,7 @@ body.tab-tk .mbar{display:none!important}
           }).join("") + "</tr>";
         }).join("") + "</tbody>";
     }
-    function renderAll() { renderTop(); renderRows(); renderPrices(); update(); }
+    function renderAll() { renderTop(); fillDishList(); syncMods(); renderRows(); renderPrices(); renderMenuBox(); update(); }
     function setO(root, key, text) { var el = root.querySelector('[data-o="' + key + '"]'); if (el) el.textContent = text; }
 
     function hintText() {
@@ -433,7 +438,7 @@ body.tab-tk .mbar{display:none!important}
     $("tkTpl").addEventListener("change", function (e) { rebuildKeep(function () { S.tpl = e.target.value; }); });
     $("tkHall").addEventListener("change", function (e) { rebuildKeep(function () { S.hall = e.target.value; }); });
     $("tkTariff").addEventListener("change", function (e) { S.tariff = e.target.value; S.manual = true; renderRows(); update(); });
-    $("tkMenu").addEventListener("change", function (e) { S.menu = e.target.value; update(); });
+    $("tkMenu").addEventListener("change", function (e) { S.menu = e.target.value; S.tb = null; syncMods(); renderRows(); renderMenuBox(); update(); });
     $("tkClient").addEventListener("input", function (e) { S.client = e.target.value; update(); });
     $("tkGuests").addEventListener("input", function (e) { S.guests = num(e.target.value); update(); });
     $("tkDate").addEventListener("input", function (e) {
@@ -477,32 +482,124 @@ body.tab-tk .mbar{display:none!important}
       $("tkAddSel").value = ""; renderRows(); update();
       if (v === "custom") { var ins = $("tkBody").querySelectorAll("input.dsel"); if (ins.length) ins[ins.length - 1].focus(); }
     });
-    // замена блюд считается во вкладке «Банкет» (по тому же пакету меню); здесь берём результат
-    function modsInfo() {
-      var n = (S.mods || []).length;
-      $("tkModsInfo").textContent = n
-        ? "Замены в меню: " + n + ". Блюда в смете гостя обновлены, доплата добавлена строкой «Изменения в меню»."
-        : "Гость хочет заменить блюдо? Выберите тот же пакет меню во вкладке «Банкет», замените блюдо там, потом нажмите кнопку выше: доплата посчитается и блюда в смете обновятся.";
-    }
-    $("tkImport").addEventListener("click", function () {
+    /* ---------- замена блюд прямо здесь: своя копия меню пакета, расчёт доплаты тот же, что во вкладке «Банкет» ---------- */
+    function ensureTb() {
       var p = menuPkg();
-      if (!p || typeof B === "undefined" || !B || !Array.isArray(B.rows) || B.pkg !== p.id) { toast("Во вкладке «Банкет» выберите тот же пакет меню: «" + (p ? p.name : "") + "»"); return; }
-      var mods = [];
-      B.rows.forEach(function (r) {
-        var s = rowState(r); if (!s.changed || s.unknown && !r.removed && !r.dish) return;
-        if (s.added) { if (r.dish) mods.push({ sec: r.sec, base: null, to: r.title, amt: amtOf(r.dish, r.g, r.pcs) }); return; }
-        mods.push({ sec: r.sec, base: baseTitle(r), to: r.removed ? null : r.title, amt: amtOf(r.dish, r.g, r.pcs) });
+      if (!p) { S.tb = null; return null; }
+      if (!S.tb || S.tb.pkg !== p.id || !Array.isArray(S.tb.rows)) { S.tb = { pkg: p.id, rows: rowsFromPkg(p) }; S.mods = []; S.rows = S.rows.filter(function (r) { return r.id !== "mods"; }); }
+      return S.tb;
+    }
+    function withB(fn) {
+      var tb = S.tb, saved = B;
+      B = { pkg: tb.pkg, rows: tb.rows, guests: S.guests, svc: {}, custom: [], svcOn: false, disc: NaN, manual: NaN };
+      try { return fn(); } finally { B = saved; }
+    }
+    function syncMods() {
+      var tb = ensureTb(); if (!tb) return null;
+      var res = withB(function () {
+        var mods = [];
+        tb.rows.forEach(function (r) {
+          var s = rowState(r); if (!s.changed || s.unknown && !r.removed && !r.dish) return;
+          if (s.added) { if (r.dish) mods.push({ sec: r.sec, base: null, to: r.title, amt: amtOf(r.dish, r.g, r.pcs) }); return; }
+          mods.push({ sec: r.sec, base: baseTitle(r), to: r.removed ? null : r.title, amt: amtOf(r.dish, r.g, r.pcs) });
+        });
+        var c = window.calc();
+        return { mods: mods, use: c.use, why: c.why, rs: c.rs, rec: c.rec };
       });
-      S.mods = mods;
-      var use = window.calc().use, G = num(S.guests);
+      S.mods = res.mods;
       S.rows = S.rows.filter(function (r) { return r.id !== "mods"; });
-      if (mods.length && use > 0) S.rows.push({ id: "mods", tpl: false, pg: true, name: "Изменения в меню", unit: "гост.", qty: 1, on: true, price: use });
-      renderRows(); update(); modsInfo();
-      toast(mods.length ? (use > 0 ? "Замены взяты, доплата " + fm(use) + " ₽ на гостя" : "Замены взяты, доплата не нужна") : "Во вкладке «Банкет» замен нет");
+      if (res.mods.length && res.use > 0) S.rows.push({ id: "mods", tpl: false, pg: true, name: "Изменения в меню", unit: "гост.", qty: 1, on: true, price: res.use });
+      return res;
+    }
+    function modsInfo() {
+      var n = (S.mods || []).length, el = $("tkModsInfo"); if (!el) return;
+      el.textContent = n
+        ? "Замен в меню: " + n + ". В смете гостя блюда обновлены, доплата добавлена строкой «Изменения в меню»."
+        : "Гость хочет заменить блюдо? Начните вводить новое название в нужной строке. Доплата посчитается сама и добавится в смету.";
+    }
+    function renderMenuBox() {
+      var tb = ensureTb(), body = $("tkMenuBody");
+      if (!tb) { body.innerHTML = '<tr><td colspan="4" class="muted">Нет пакета меню с ценой.</td></tr>'; return; }
+      var h = "", last = null;
+      tb.rows.forEach(function (r, i) {
+        if (r.sec !== last) { h += '<tr class="sec"><td colspan="4">' + esc(r.sec) + "</td></tr>"; last = r.sec; }
+        var d = dishById(r.dish), isPcs = d && d.unit === "шт";
+        var q = isPcs
+          ? '<div class="qty"><input class="num" data-k="pcs" inputmode="decimal" value="' + (fin(r.pcs) ? r.pcs : "") + '" aria-label="Штук на гостя"><span>шт</span></div>'
+          : '<div class="qty"><input class="num" data-k="g" inputmode="decimal" value="' + (fin(r.g) ? r.g : "") + '" aria-label="Граммов на гостя"><span>' + (d && d.unit === "л" ? "мл" : "г") + "</span></div>";
+        var changed = r.base && (r.dish !== r.base.dish || r.g !== r.base.g || r.pcs !== r.base.pcs || r.removed);
+        h += '<tr data-i="' + i + '"><td><input class="dsel" list="dishList" data-k="dish" value="' + esc(r.title) + '" aria-label="Блюдо"><div class="aiko"><span data-o="chips"></span></div></td>' +
+          '<td class="r">' + q + '</td><td class="r v int" data-o="delta"></td><td class="r" style="white-space:nowrap">' +
+          (changed ? '<button type="button" class="icon" data-act="undo" title="Вернуть как в пакете" aria-label="Вернуть как в пакете">↺</button>' : "") +
+          '<button type="button" class="icon" data-act="' + (r.base ? (r.removed ? "restore" : "remove") : "del") + '" aria-label="' + (r.removed ? "Вернуть блюдо" : "Убрать блюдо") + '">' + (r.removed ? "+" : "✕") + "</button></td></tr>";
+      });
+      body.innerHTML = h;
+      updateMenuBox();
+    }
+    function updateMenuBox() {
+      var tb = S.tb; if (!tb) return;
+      var c = withB(function () { return { rs: window.calc().rs, use: window.calc().use, why: window.calc().why, rec: window.calc().rec }; });
+      var body = $("tkMenuBody");
+      [].forEach.call(body.querySelectorAll("tr[data-i]"), function (tr) {
+        var i = +tr.dataset.i, r = tb.rows[i], s = c.rs[i], d = dishById(r.dish); if (!r || !s) return;
+        tr.classList.toggle("changed", s.changed && !r.removed); tr.classList.toggle("removed", !!r.removed);
+        var ch = "";
+        if (r.removed) ch += '<span class="chip mute">убрано</span>';
+        else if (s.added) ch += '<span class="chip swap">сверх пакета</span>';
+        else if (s.swapped) ch += '<span class="chip swap">замена</span>';
+        else if (s.qtyChanged) ch += '<span class="chip swap">граммовка изменена</span>';
+        if (!d) ch += '<span class="chip bad">нет в справочнике</span>';
+        else if (!fin(d.cost)) ch += '<span class="chip bad int">нет себестоимости</span>';
+        tr.querySelector('[data-o="chips"]').innerHTML = ch;
+        var dl = tr.querySelector('[data-o="delta"]');
+        dl.textContent = s.changed ? (s.unknown ? "?" : (s.delta > 0 ? "+" : s.delta < 0 ? "−" : "") + fm(Math.abs(s.delta), 2)) : "";
+        dl.className = "r v int " + (s.delta > 0 ? "pos" : s.delta < 0 ? "neg" : "");
+      });
+      var n = $("tkMenuNote"), G = num(S.guests);
+      if (!(S.mods || []).length) { n.hidden = true; return; }
+      n.hidden = false; n.className = "note " + (c.use > 0 ? "warn" : "ok");
+      n.textContent = c.use > 0
+        ? "Доплата за изменения: " + fm(c.use) + " ₽ на гостя" + (G > 0 ? ", " + fm(c.use * G) + " ₽ на всех гостей" : "") + ". " + c.why
+        : c.why;
+    }
+    function menuChanged() { syncMods(); renderRows(); update(); updateMenuBox(); }
+    function tbRow(el) { var tr = el.closest("tr[data-i]"); return tr && S.tb ? { tr: tr, i: +tr.dataset.i, r: S.tb.rows[+tr.dataset.i] } : null; }
+    $("tkMenuBody").addEventListener("input", function (e) {
+      var x = tbRow(e.target), k = e.target.dataset.k; if (!x || !x.r) return;
+      if (k === "g" || k === "pcs") { x.r[k] = num(e.target.value); if (!fin(x.r[k])) x.r[k] = 0; menuChanged(); }
     });
-    $("tkImportClear").addEventListener("click", function () {
-      S.mods = []; S.rows = S.rows.filter(function (r) { return r.id !== "mods"; });
-      renderRows(); update(); modsInfo(); toast("Замены убраны");
+    $("tkMenuBody").addEventListener("change", function (e) {
+      var x = tbRow(e.target); if (!x || !x.r || e.target.dataset.k !== "dish") return;
+      var r = x.r, v = e.target.value.trim();
+      var bt = r.base ? withB(function () { return baseTitle(r); }) : null;
+      if (r.base && norm(v) === norm(bt)) { r.dish = r.base.dish; r.title = bt; r.g = r.base.g; r.pcs = r.base.pcs; }
+      else {
+        var d = findDish(v);
+        if (!d) { toast("Такого блюда нет в справочнике"); e.target.value = r.title; return; }
+        var od = dishById(r.dish); r.dish = d.id; r.title = clean(d.name);
+        if (d.unit === "шт" && !(r.pcs > 0)) r.pcs = 1;
+        if (d.unit !== "шт" && !(r.g > 0)) r.g = od && od.unit === "шт" ? 40 : 100;
+      }
+      r.removed = false; renderMenuBox(); menuChanged();
+    });
+    $("tkMenuBody").addEventListener("click", function (e) {
+      var b = e.target.closest("button[data-act]"), x = b && tbRow(b); if (!x || !x.r) return;
+      var r = x.r, a = b.dataset.act;
+      if (a === "remove") r.removed = true;
+      if (a === "restore") r.removed = false;
+      if (a === "undo") { r.dish = r.base.dish; r.g = r.base.g; r.pcs = r.base.pcs; r.removed = false; r.title = withB(function () { return baseTitle(r); }); }
+      if (a === "del") S.tb.rows.splice(x.i, 1);
+      renderMenuBox(); menuChanged();
+    });
+    $("tkMenuAdd").addEventListener("click", function () {
+      if (!ensureTb()) return;
+      S.tb.rows.push({ sec: "Дополнительно", title: "", base: null, dish: null, g: 100, pcs: 1, removed: false });
+      $("tkMenuBox").open = true; renderMenuBox(); menuChanged();
+      var ins = $("tkMenuBody").querySelectorAll("input.dsel"); if (ins.length) ins[ins.length - 1].focus();
+    });
+    $("tkMenuReset").addEventListener("click", function () {
+      var p = menuPkg(); if (!p) return;
+      S.tb = { pkg: p.id, rows: rowsFromPkg(p) }; renderMenuBox(); menuChanged(); toast("Меню как в пакете");
     });
     $("tkPriceTbl").addEventListener("change", function (e) {
       var id = e.target.dataset.pr, t = e.target.dataset.pt; if (!id) return;
