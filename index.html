@@ -1,0 +1,311 @@
+<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"><meta name="robots" content="noindex, nofollow">
+<title>Банкетный калькулятор RizzW</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Golos+Text:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: рабочий инструмент. Шапка с вкладками; во вкладке «Банкет» слева меню и услуги, справа закреплённая сводка */
+:root{
+--bg:#f2f3f1; --surface:#ffffff; --sunk:#f7f8f6; --line:#dcdfd9; --fg:#1d2320; --muted:#5f6862;
+--accent:#1d5c4d; --accent-soft:#e1eee8; --warn:#9a5214; --warn-soft:#f7eadc; --bad:#a3323a; --bad-soft:#f6e1e3;
+--chg:#fbf6e6;
+--font-ui:"Golos Text",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+--font-num:"JetBrains Mono",ui-monospace,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+--bg:#131715; --surface:#1b201d; --sunk:#171b19; --line:#2e3531; --fg:#e6eae7; --muted:#9aa39d;
+--accent:#6fc2a8; --accent-soft:#1d3830; --warn:#e3a26a; --warn-soft:#382819; --bad:#ec8a90; --bad-soft:#3b2124; --chg:#2a2717; color-scheme:dark}}
+:root[data-theme="dark"]{
+--bg:#131715; --surface:#1b201d; --sunk:#171b19; --line:#2e3531; --fg:#e6eae7; --muted:#9aa39d;
+--accent:#6fc2a8; --accent-soft:#1d3830; --warn:#e3a26a; --warn-soft:#382819; --bad:#ec8a90; --bad-soft:#3b2124; --chg:#2a2717; color-scheme:dark}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{margin:0}
+body{background:var(--bg);color:var(--fg);font-family:var(--font-ui);font-size:14.5px;line-height:1.45}
+.wrap{max-width:1320px;margin:0 auto;padding-inline:16px;padding-block:16px 48px;display:grid;gap:16px}
+header.top{display:flex;flex-wrap:wrap;gap:12px 20px;align-items:center;justify-content:space-between}
+h1{font-size:1.35rem;margin:0;font-weight:700;text-wrap:balance}
+h1 small{display:block;font-size:.8rem;font-weight:400;color:var(--muted)}
+h2{font-size:1rem;margin:0;font-weight:600}
+h3{font-size:.8rem;margin:0;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:var(--muted)}
+nav.tabs{display:flex;gap:4px;flex-wrap:wrap;background:var(--surface);border:1px solid var(--line);border-radius:9px;padding:4px}
+nav.tabs button{border:none;background:transparent;padding:7px 14px;border-radius:6px;font-weight:500;color:var(--muted)}
+nav.tabs button[aria-selected="true"]{background:var(--accent);color:var(--surface)}
+.topright{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:16px;display:grid;gap:12px;min-width:0}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.between{justify-content:space-between}
+.grid-params{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
+label.f{display:grid;gap:3px;font-size:.78rem;color:var(--muted)}
+input,select,textarea{font:inherit;color:var(--fg);background:var(--sunk);border:1px solid var(--line);border-radius:6px;padding:6px 8px;width:100%;min-width:0}
+textarea{min-height:110px;font-family:var(--font-num);font-size:.85rem}
+input:focus,select:focus,textarea:focus,button:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+input.num{font-family:var(--font-num);text-align:right;font-variant-numeric:tabular-nums}
+button{font:inherit;cursor:pointer;border-radius:6px;border:1px solid var(--line);background:var(--surface);color:var(--fg);padding:6px 12px}
+button.pri{background:var(--accent);border-color:var(--accent);color:var(--surface);font-weight:600}
+button.ghost{border-style:dashed;color:var(--accent)}
+button.icon{padding:2px 7px;border-color:transparent;background:transparent;color:var(--muted)}
+button.icon:hover{color:var(--bad)}
+button.link{border:none;background:none;padding:0;color:var(--accent);text-decoration:underline;text-underline-offset:2px}
+.layout{display:grid;grid-template-columns:minmax(0,1fr) 360px;gap:16px;align-items:start}
+@media (max-width:980px){.layout{grid-template-columns:1fr}}
+.col{display:grid;gap:16px;min-width:0}
+.sticky{position:sticky;top:calc(env(safe-area-inset-top,0px) + 10px);max-height:calc(100vh - 20px);overflow:auto;overscroll-behavior:contain}
+@media (max-width:980px){.sticky{position:static;max-height:none;overflow:visible}}
+.tw{overflow-x:auto}
+table{border-collapse:collapse;width:100%}
+th{font-size:.7rem;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);font-weight:600;text-align:left;padding:6px;border-bottom:1px solid var(--line);white-space:nowrap}
+td{padding:5px 6px;border-bottom:1px solid var(--line);vertical-align:middle}
+th.r,td.r{text-align:right}
+td.v,.v{font-family:var(--font-num);font-variant-numeric:tabular-nums;white-space:nowrap}
+tr.sec td{background:var(--sunk);font-size:.72rem;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);font-weight:600;padding-block:4px}
+tr.changed td{background:var(--chg)}
+tr.removed td{opacity:.55}
+tr.removed .dname{text-decoration:line-through}
+.dname{font-weight:500}
+.aiko{font-size:.75rem;color:var(--muted);margin-top:2px}
+.menu-tbl{min-width:640px}
+.menu-tbl input.dsel{background:transparent;border-color:transparent;padding:3px 4px;font-weight:500}
+.menu-tbl input.dsel:hover,.menu-tbl input.dsel:focus{background:var(--sunk);border-color:var(--line)}
+.qty{display:flex;align-items:center;gap:4px;justify-content:flex-end}
+.qty input{width:70px}
+.qty span{font-size:.78rem;color:var(--muted);min-width:22px}
+.chip{display:inline-block;font-size:.7rem;padding:1px 7px;border-radius:99px;white-space:nowrap;margin-left:4px;vertical-align:middle}
+.chip.swap{background:var(--accent-soft);color:var(--accent)}
+.chip.warn{background:var(--warn-soft);color:var(--warn)}
+.chip.bad{background:var(--bad-soft);color:var(--bad)}
+.chip.mute{border:1px solid var(--line);color:var(--muted)}
+.pos{color:var(--warn)} .neg{color:var(--accent)}
+.big{display:grid;gap:2px;padding:12px 14px;border-radius:8px;background:var(--accent-soft)}
+.big .lbl{font-size:.78rem;color:var(--muted)}
+.big .val{font-family:var(--font-num);font-size:1.9rem;font-weight:600;color:var(--accent);font-variant-numeric:tabular-nums;line-height:1.15}
+.big .sub{font-family:var(--font-num);font-size:.9rem}
+.kv{display:flex;justify-content:space-between;gap:10px;font-size:.9rem}
+.kv>span:last-child{font-family:var(--font-num);font-variant-numeric:tabular-nums;text-align:right;white-space:nowrap}
+.kv.em{font-weight:700;font-size:1rem;border-top:1px solid var(--line);padding-top:10px}
+.kv.sm{font-size:.82rem;color:var(--muted)}
+.blk{display:grid;gap:6px;border-top:1px solid var(--line);padding-top:10px}
+.why{font-size:.83rem;color:var(--muted);margin:0}
+.note{font-size:.83rem;padding:8px 10px;border-radius:6px;margin:0}
+.note.warn{background:var(--warn-soft);color:var(--warn)}
+.note.bad{background:var(--bad-soft);color:var(--bad)}
+.note.ok{background:var(--accent-soft);color:var(--accent)}
+.muted{color:var(--muted)}
+.small{font-size:.82rem}
+details summary{cursor:pointer;font-weight:600}
+.bar{height:8px;border-radius:4px;background:var(--sunk);overflow:hidden;min-width:80px}
+.bar i{display:block;height:100%;background:var(--accent)}
+.bar i.hi{background:var(--warn)}
+tr.pick{cursor:pointer}
+tr.pick:hover td{background:var(--sunk)}
+tr.pick.sel td{background:var(--accent-soft)}
+.toast{position:fixed;left:50%;bottom:calc(env(safe-area-inset-bottom,0px) + 18px);transform:translateX(-50%);background:var(--fg);color:var(--bg);padding:8px 16px;border-radius:8px;font-size:.9rem;z-index:20}
+body.guest .int{display:none!important}
+.switch{display:flex;align-items:center;gap:6px;font-size:.85rem;color:var(--muted);cursor:pointer;user-select:none}
+.switch input{width:auto}
+#printArea{display:none}
+@media print{
+body{background:#fff;color:#000}
+.wrap{display:none}
+#printArea{display:block;font-family:var(--font-ui);padding:12mm;color:#000}
+#printArea table{width:100%;border-collapse:collapse}
+#printArea td,#printArea th{border-bottom:1px solid #ccc;padding:4px 6px;color:#000}
+}
+.sharebar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between}
+.mbar{display:none}
+body.inviewer #printSmeta,body.inviewer #exportAll{display:none}
+@media (max-width:980px){
+body.tab-banq .mbar{display:flex;position:fixed;left:0;right:0;bottom:0;z-index:15;gap:12px;align-items:center;justify-content:space-between;
+background:var(--surface);border-top:1px solid var(--line);padding:10px 16px calc(10px + env(safe-area-inset-bottom,0px));font-size:.9rem}
+.mbar b{font-family:var(--font-num);font-variant-numeric:tabular-nums}
+body.tab-banq .wrap{padding-bottom:84px}
+}
+@media (max-width:640px){
+.menu-tbl,.menu-tbl tbody{display:block;min-width:0}
+.menu-tbl thead{display:none}
+.menu-tbl tr.sec,.menu-tbl tr.sec td{display:block}
+.menu-tbl tr[data-i]{display:grid;grid-template-columns:1fr auto auto auto;align-items:center;border-bottom:1px solid var(--line);padding-block:4px}
+.menu-tbl tr[data-i] td{border-bottom:none}
+.menu-tbl tr[data-i] td:first-child{grid-column:1/-1}
+.menu-tbl tr[data-i] .qty{justify-content:flex-start}
+.menu-tbl tr[data-i] td.r:first-of-type{text-align:left}
+h1{font-size:1.15rem}
+}
+body.locked .wrap,body.locked .mbar{display:none!important}
+.gate{position:fixed;inset:0;display:grid;place-items:center;background:var(--bg);padding:16px;z-index:30}
+.gate form{max-width:340px;width:100%}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+</head><body>
+<div class="wrap">
+<header class="top">
+<h1>Банкетный калькулятор RizzW<small id="hdrSub"></small></h1>
+<nav class="tabs" role="tablist" aria-label="Разделы">
+<button type="button" role="tab" data-tab="banq" aria-selected="true">Банкет</button>
+<button type="button" role="tab" data-tab="pkgs" aria-selected="false">Пакеты</button>
+<button type="button" role="tab" data-tab="dish" aria-selected="false">Справочник блюд</button>
+<button type="button" role="tab" data-tab="saved" aria-selected="false">Сохранённые</button>
+</nav>
+<div class="topright">
+<label class="switch" for="guestMode"><input type="checkbox" id="guestMode"> Скрыть себестоимость</label>
+<button type="button" id="xlsAll">Пакеты и цены в Excel</button>
+<button type="button" id="exportAll" title="Файл для переноса данных в калькулятор на другом устройстве. Открывается только кнопкой «Загрузить копию».">Резервная копия</button>
+<button type="button" id="importAllBtn">Загрузить копию</button>
+<input type="file" id="importAll" accept=".json,application/json" hidden>
+</div>
+</header>
+<div class="panel sharebar" id="shareBar" hidden>
+<span class="small">Изменения в справочнике, пакетах или сохранённых банкетах пока видите только вы.</span>
+<button type="button" class="pri" id="shareBtn">Сохранить для всех</button>
+</div>
+<p class="note warn" id="roNote" hidden>У вас доступ только для просмотра: считать можно, но изменения цен и пакетов сохраняются только на этом устройстве.</p>
+<!-- ===== БАНКЕТ ===== -->
+<section id="tab-banq" class="layout">
+<div class="col">
+<div class="panel">
+<div class="row between"><h2>Банкет</h2>
+<div class="row"><button type="button" id="newBanq">Новый банкет</button><button type="button" class="pri" id="saveBanq">Сохранить банкет</button></div></div>
+<div class="grid-params">
+<label class="f" for="bClient">Клиент<input id="bClient" placeholder="Например, Костя"></label>
+<label class="f" for="bDate">Дата мероприятия<input id="bDate" type="date"></label>
+<label class="f" for="bGuests">Гостей<input id="bGuests" class="num" inputmode="numeric"></label>
+<label class="f" for="bPkg">Пакет<select id="bPkg"></select></label>
+</div>
+<p class="why" id="pkgNote"></p>
+</div>
+<div class="panel">
+<div class="row between"><h2>Меню</h2><span class="small muted">Чтобы заменить блюдо, начните вводить название в строке. Граммовку можно менять.</span></div>
+<div class="tw"><table class="menu-tbl">
+<thead><tr><th>Блюдо</th><th class="r">На гостя</th><th class="r int">Себест., ₽</th><th class="r int">Разница, ₽</th><th></th></tr></thead>
+<tbody id="menuBody"></tbody>
+</table></div>
+<div class="row"><button type="button" class="ghost" id="addRow">+ Добавить блюдо сверх пакета</button><button type="button" id="resetMenu">Вернуть меню пакета</button></div>
+</div>
+<div class="panel">
+<div class="row between"><h2>Аренда и услуги</h2><span class="small muted">Укажите количество, сумма посчитается</span></div>
+<div class="tw"><table style="min-width:520px">
+<thead><tr><th>Услуга</th><th class="r">Цена, ₽</th><th class="r">Кол-во</th><th class="r">Сумма, ₽</th><th></th></tr></thead>
+<tbody id="svcBody"></tbody>
+<tfoot><tr><td colspan="3"><b>Итого услуги</b></td><td class="r v" id="svcTot"></td><td></td></tr></tfoot>
+</table></div>
+<button type="button" class="ghost" id="addCustom">+ Своя строка (ведущий, декор, торт…)</button>
+</div>
+<div class="panel">
+<details id="kitchen"><summary>Заявка на кухню: сколько готовить</summary>
+<div class="tw" style="margin-top:10px"><table style="min-width:420px">
+<thead><tr><th>Блюдо</th><th class="r">На гостя</th><th class="r">Всего</th></tr></thead>
+<tbody id="kitBody"></tbody></table></div>
+</details>
+</div>
+</div>
+<aside class="col sticky" aria-live="polite">
+<div class="panel">
+<h2>Доплата за изменения меню</h2>
+<div class="big"><span class="lbl">Рекомендуемая доплата на гостя</span><span class="val" id="sRec">0 ₽</span><span class="sub" id="sRecTot"></span></div>
+<p class="why" id="sWhy"></p>
+<div class="blk int">
+<div class="kv sm"><span>Себестоимость пакета на гостя</span><span id="sC0"></span></div>
+<div class="kv sm"><span>Фудкост пакета</span><span id="sF"></span></div>
+<div class="kv sm"><span>Разница себестоимости на гостя</span><span id="sD"></span></div>
+<div class="kv"><span>Минимум (ниже — убыток)</span><span id="sMin"></span></div>
+<div class="kv"><span>Норма (та же наценка)</span><span id="sNorm"></span></div>
+<div class="kv"><span>Потолок (разница пакетов)</span><span id="sCap"></span></div>
+</div>
+<label class="f" for="bManual">Своя доплата на гостя, если договорились иначе<input id="bManual" class="num" inputmode="decimal" placeholder="по расчёту"></label>
+<p class="note" id="sManualNote" hidden></p>
+</div>
+<div class="panel">
+<h2>Смета для гостя</h2>
+<div class="kv"><span id="lMenu">Меню</span><span id="tMenu"></span></div>
+<div class="row" style="gap:8px">
+<label class="f" for="bDisc" style="flex:1">Скидка на меню, %<input id="bDisc" class="num" inputmode="decimal" placeholder="0"></label>
+<label class="switch" for="bSvcOn" style="flex:1;align-self:end;padding-bottom:6px"><input type="checkbox" id="bSvcOn"> <span id="lSvcOn">Обслуживание</span></label>
+</div>
+<div class="kv" id="rowDisc" hidden><span>Скидка</span><span id="tDisc"></span></div>
+<div class="kv" id="rowSvc"><span id="lSvc">Обслуживание</span><span id="tSvc"></span></div>
+<div class="kv"><span>Аренда и услуги</span><span id="tSvcs"></span></div>
+<div class="kv em"><span>Итого</span><span id="tTotal"></span></div>
+<div class="kv"><span id="lPre">Предоплата при договоре</span><span id="tPre"></span></div>
+<div class="kv"><span id="lRest">Остаток</span><span id="tRest"></span></div>
+<div class="kv sm" id="rowChg"><span>Изменения меню принимаются до</span><span id="tChg"></span></div>
+<div class="row"><button type="button" id="xlsSmeta">Смета в Excel</button><button type="button" id="copySmeta">Скопировать смету</button><button type="button" id="printSmeta">Печать / PDF</button></div>
+</div>
+<div class="panel int">
+<h2>Для нас</h2>
+<div class="kv"><span>Себестоимость еды на банкет</span><span id="iCost"></span></div>
+<div class="kv"><span>Фудкост банкета</span><span id="iFc"></span></div>
+<div class="kv"><span>Валовая прибыль по еде</span><span id="iGp"></span></div>
+<div class="kv sm"><span>на гостя</span><span id="iGpG"></span></div>
+<div id="iWarn" class="blk" hidden></div>
+</div>
+</aside>
+</section>
+<!-- ===== ПАКЕТЫ ===== -->
+<section id="tab-pkgs" class="col" hidden>
+<div class="panel">
+<div class="row between"><h2>Пакеты: себестоимость и фудкост</h2><button type="button" class="ghost" id="addPkg">+ Новый пакет</button></div>
+<p class="why">Нажмите на пакет, чтобы открыть состав. Порог фудкоста для подсветки задаётся в <button type="button" class="link" data-goto="dish">справочнике</button>.</p>
+<div class="tw"><table style="min-width:720px">
+<thead><tr><th>Пакет</th><th class="r">Цена на гостя</th><th class="r">Себестоимость</th><th>Фудкост</th><th class="r">Наценка ×</th><th class="r">Нет цены</th></tr></thead>
+<tbody id="pkgList"></tbody></table></div>
+</div>
+<div class="panel" id="pkgEdit"></div>
+</section>
+<!-- ===== СПРАВОЧНИК ===== -->
+<section id="tab-dish" class="col" hidden>
+<div class="panel">
+<div class="row between"><h2>Справочник блюд</h2><span class="small muted" id="dishInfo"></span></div>
+<div class="grid-params">
+<label class="f" for="dSearch">Поиск<input id="dSearch" placeholder="Название блюда"></label>
+<label class="f" for="dGroup">Группа<select id="dGroup"></select></label>
+<label class="f" for="dOnly">Показать<select id="dOnly"><option value="">все блюда</option><option value="miss">без себестоимости</option><option value="star">со звёздочкой (*)</option><option value="pcs">штучные</option><option value="used">в пакетах</option></select></label>
+</div>
+<div class="tw"><table style="min-width:760px">
+<thead><tr><th>Блюдо (как в Айко)</th><th>Группа</th><th>Ед.</th><th class="r">Себест. за ед., ₽</th><th>В пакетах</th><th></th></tr></thead>
+<tbody id="dishBody"></tbody></table></div>
+<button type="button" class="ghost" id="addDish">+ Добавить блюдо</button>
+</div>
+<div class="panel">
+<h2>Обновить цены из Айко</h2>
+<p class="why">Выгрузите из Айко список «Блюда» с себестоимостью (как в файле, который вы присылали) и загрузите его сюда. Цены обновятся по точному совпадению названия, новые блюда добавятся. Можно также скопировать строки из Айко и вставить в поле.</p>
+<div class="row"><input type="file" id="aikoFile" accept=".xlsx,.xls" style="max-width:340px"></div>
+<label class="f" for="aikoPaste">Или вставьте строки: название и себестоимость (через табуляцию или ;)<textarea id="aikoPaste" placeholder="Дорада запеченная со специями; 1267,03"></textarea></label>
+<div class="row"><button type="button" class="pri" id="aikoApply">Обновить по вставленным строкам</button></div>
+<div id="aikoReport"></div>
+</div>
+<div class="panel">
+<h2>Настройки расчёта</h2>
+<div class="grid-params">
+<label class="f" for="stSvc">Обслуживание, %<input id="stSvc" class="num" data-st="service"></label>
+<label class="f" for="stPre">Предоплата, %<input id="stPre" class="num" data-st="prepay"></label>
+<label class="f" for="stPay">Остаток оплатить за, дней<input id="stPay" class="num" data-st="payDays"></label>
+<label class="f" for="stChg">Изменения за, рабочих дней<input id="stChg" class="num" data-st="changeDays"></label>
+<label class="f" for="stRound">Округлять доплату до, ₽<input id="stRound" class="num" data-st="roundTo"></label>
+<label class="f" for="stFc">Порог фудкоста, %<input id="stFc" class="num" data-st="fcWarn"></label>
+</div>
+<div class="tw"><table style="min-width:520px">
+<thead><tr><th>Услуга (прайс)</th><th class="r">Цена, ₽</th><th>Ед.</th><th></th></tr></thead>
+<tbody id="svcPrice"></tbody></table></div>
+<button type="button" class="ghost" id="addSvcPrice">+ Услуга в прайс</button>
+</div>
+</section>
+<!-- ===== СОХРАНЁННЫЕ ===== -->
+<section id="tab-saved" class="col" hidden>
+<div class="panel">
+<h2>Сохранённые банкеты</h2>
+<p class="why">Банкеты хранятся в этом браузере. Чтобы перенести их на другой компьютер, нажмите «Резервная копия», а там — «Загрузить копию».</p>
+<div class="tw"><table style="min-width:640px">
+<thead><tr><th>Дата</th><th>Клиент</th><th>Пакет</th><th class="r">Гостей</th><th class="r">Итого, ₽</th><th class="r int">Фудкост</th><th></th></tr></thead>
+<tbody id="savedBody"></tbody></table></div>
+</div>
+</section>
+</div>
+<div class="mbar" id="mbar"><span>Доплата <b id="mRec">—</b></span><span>Итого <b id="mTot">—</b></span><button type="button" id="mGo">К смете ↓</button></div>
+<div id="printArea"></div>
+<datalist id="dishList"></datalist>
+<div class="toast" id="toast" hidden></div>
+<script>window.RIZZW_PIN="c9f1b1bcf684433fe9b58d452274e074278c6e39a7b1950325ca60056075b9c2";</script>
+<script src="data.js"></script>
+<script src="patch.js"></script>
+<script src="app.js"></script>
+<script src="extra.js"></script>
+</body></html>
