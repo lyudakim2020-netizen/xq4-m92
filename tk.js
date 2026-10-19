@@ -299,7 +299,7 @@ body.tab-tk .mbar{display:none!important}
 <div class="kv"><span id="tkLRest">Остаток</span><span id="tkTRest"></span></div>
 <p class="note warn" id="tkWarn" hidden></p>
 </div>
-<div class="panel int"><h2>Для нас</h2><div class="kv"><span>Выходит на одного гостя</span><span id="tkTPer"></span></div></div>
+<div class="panel int"><h2>Для нас</h2><div class="kv"><span>Выходит на одного гостя</span><span id="tkTPer"></span></div><div id="tkRef"></div></div>
 <div class="panel">
 <h2>Смета для гостя</h2>
 <label class="switch" for="tkShowPrices"><input type="checkbox" id="tkShowPrices"> Показывать гостю цены услуг</label>
@@ -407,6 +407,7 @@ body.tab-tk .mbar{display:none!important}
       $("tkLPre").textContent = "Предоплата " + fm(num(DB.settings.prepay)) + "% при договоре"; $("tkTPre").textContent = rub(c.pre);
       $("tkLRest").textContent = c.dt ? "Остаток до " + fmtD(minusDays(c.dt, num(DB.settings.payDays) || 0)) : "Остаток"; $("tkTRest").textContent = rub(c.rest);
       $("tkTPer").textContent = rub(c.per);
+      renderRef();
       var w = [], mg = hallDef().min;
       if (!(c.G > 0)) w.push("Укажите количество гостей.");
       if (!c.pk) w.push("Нет пакета меню с ценой: задайте цену во вкладке «Пакеты».");
@@ -562,6 +563,47 @@ body.tab-tk .mbar{display:none!important}
       n.textContent = c.use > 0
         ? "Доплата за изменения: " + fm(c.use) + " ₽ на гостя" + (G > 0 ? ", " + fm(c.use * G) + " ₽ на всех гостей" : "") + ". " + c.why
         : c.why + (c.safeRed > 0 ? " Если гость просит скидку за убранное: не больше " + fm(c.safeRed) + " ₽ на гостя" + (G > 0 ? " (" + fm(c.safeRed * G) + " ₽ на всех)" : "") + ", иначе прибыль в рублях упадёт. В смету скидка не добавляется сама." : "");
+    }
+    function renderRef() {
+      var el = $("tkRef"); if (!el) return;
+      var tb = S.tb; if (!tb) { el.innerHTML = ""; return; }
+      var G = num(S.guests);
+      var x = withB(function () {
+        var c = window.calc(), rows = [];
+        tb.rows.forEach(function (r, i) {
+          var st = c.rs[i]; if (!st || !st.changed) return;
+          rows.push({ from: r.base ? baseTitle(r) : null, to: r.removed ? null : r.title, delta: st.delta, base: st.base, cur: st.cur, unknown: st.unknown, gst: st.gst, capFrom: st.capFrom });
+        });
+        return { rows: rows, P: c.P, F: c.F, D: c.D, rec: c.rec, use: c.use, why: c.why, cost0: c.st.cost, addG: c.addG || 0, remG: c.remG || 0, safeRed: c.safeRed || 0, normRed: c.normRed || 0, hasP: !!c.p };
+      });
+      if (!x.hasP) { el.innerHTML = ""; return; }
+      function kv(a, b, cls) { return '<div class="kv ' + (cls || "sm") + '"><span>' + a + "</span><span>" + b + "</span></div>"; }
+      function tot(v) { return fm(v) + " ₽" + (G > 0 ? " · на всех " + fm(v * G) + " ₽" : ""); }
+      var h = '<h3 style="margin:14px 0 6px;font-size:.95rem">Замены меню: расчёт доплаты</h3>';
+      h += kv("Пакет «" + esc((menuPkg() || {}).name || "") + "»: цена на гостя", fm(x.P) + " ₽");
+      h += kv("Себестоимость пакета / фудкост", fm(x.cost0, 2) + " ₽ / " + pct(x.F));
+      if (!x.rows.length) { el.innerHTML = h + '<p class="why">Замен нет: меню как в пакете, доплаты нет.</p>'; return; }
+      h += '<div style="margin:8px 0 4px;font-weight:600;font-size:.85rem">Что изменено</div>';
+      x.rows.forEach(function (r) {
+        var what = r.from === null ? "Добавлено: «" + esc(r.to) + "»" : r.to === null ? "Убрано: «" + esc(r.from) + "»" : r.from === r.to ? "Граммовка: «" + esc(r.to) + "»" : "«" + esc(r.from) + "» → «" + esc(r.to) + "»";
+        var val = r.unknown ? "нет себестоимости" : "себест. " + fm(r.base, 2) + " → " + fm(r.cur, 2) + " (" + sgn(r.delta) + " ₽); гостю " + (r.gst > 0 ? "+" : r.gst < 0 ? "−" : "") + fm(Math.abs(r.gst)) + " ₽";
+        h += '<div class="kv sm" style="align-items:flex-start;gap:10px"><span>' + what + '</span><span style="text-align:right">' + val + "</span></div>";
+      });
+      h += kv("Разница себестоимости на гостя", sgn(x.D) + " ₽");
+      h += kv("Доплата за замены и добавки (по норме)", x.addG > 0 ? "+" + fm(x.addG) + " ₽" : "—");
+      h += kv("Скидка за убранное и более дешёвое (по норме)", x.remG > 0 ? "−" + fm(x.remG) + " ₽" : "—");
+      h += kv("Идёт в смету гостя (строка «Изменения в меню»)", x.use > 0 ? tot(x.use) : "ничего", "em");
+      var cost1 = x.cost0 + (x.unknownAny ? 0 : x.D), price1 = x.P + (x.use > 0 ? x.use : 0);
+      h += kv("Себестоимость меню после замен", fm(cost1, 2) + " ₽ (было " + fm(x.cost0, 2) + " ₽)");
+      if (price1 > 0) h += kv("Фудкост после замен", pct(cost1 / price1) + " (было " + pct(x.F) + ")");
+      h += kv("Прибыль с блюд на гостя", fm(price1 - cost1, 2) + " ₽ (было " + fm(x.P - x.cost0, 2) + " ₽)");
+      if (x.safeRed > 0) {
+        h += kv("Если гость просит скидку: не больше (прибыль в рублях не падает)", tot(x.safeRed));
+        h += kv("Скидка по норме фудкоста (прибыль падает)", tot(x.normRed));
+      }
+      if (x.rows.some(function (r) { return r.capFrom; })) h += '<p class="why">Замена на блюдо из более дорогого пакета: доплата ограничена разницей цен пакетов.</p>';
+      h += '<p class="why">' + esc(x.why) + "</p>";
+      el.innerHTML = h;
     }
     function menuChanged() { syncMods(); renderRows(); update(); updateMenuBox(); }
     function tbRow(el) { var tr = el.closest("tr[data-i]"); return tr && S.tb ? { tr: tr, i: +tr.dataset.i, r: S.tb.rows[+tr.dataset.i] } : null; }
