@@ -1,6 +1,6 @@
 // оставляем только типовые пакеты; настройки фуршета по умолчанию
 window.RIZZW_SEED.packages = window.RIZZW_SEED.packages.filter(p => p.kind === "package");
-window.RIZZW_SEED.rev = "2026-10-19T13:50:00Z";
+window.RIZZW_SEED.rev = "2026-10-19T14:05:00Z";
 // 19.10: вернули прежние цены пакетов (как в банкетном меню 2026): Гриль 4 800, Дорадо 5 980, Лосось 7 200
 (function () {
   var P = { p1: 4800, p2: 5980, p3: 7200 };
@@ -23,9 +23,9 @@ window.RIZZW_SEED.rev = "2026-10-19T13:50:00Z";
   window.RIZZW_SEED.dishes.forEach(function (d) { if (f[d.id] !== undefined) d.cost = f[d.id]; });
 })();
 // себестоимость хлеба и напитков по техкарте «Меню Гриль 4800» из Айко (19.10): багет 220 ₽/кг (в Айко со *), дарницкий 86,75 ₽/кг,
-// булочки (чёрные/белые) считаем как среднее багета и дарницкого, морс «Ягодный» = вишня + брусника (17,07 + 30,13 за 0,4 л) = 118 ₽/л, вода 0,5 л = 31,28 ₽ (62,56 ₽/л)
+// булочки = хлеб дарницкий 86,75 ₽/кг, морс «Ягодный» = вишня + брусника (17,07 + 30,13 за 0,4 л) = 118 ₽/л, вода 0,5 л = 31,28 ₽ (62,56 ₽/л)
 (function () {
-  var c = { d94: [220, true], d95: [86.75, false], d96: [153.38, false], d97: [118, false], d98: [62.56, false] };
+  var c = { d94: [220, true], d95: [86.75, false], d96: [86.75, false], d97: [118, false], d98: [62.56, false] };
   window.RIZZW_SEED.dishes.forEach(function (d) { var x = c[d.id]; if (x) { d.cost = x[0]; d.star = x[1]; if (d.group === "Нет в выгрузке Айко") d.group = "Хлеб и напитки (техкарта Айко)"; } });
 })();
 Object.assign(window.RIZZW_SEED.settings, { furTarget: 16, furFloor: 17, furMin: 0 });
