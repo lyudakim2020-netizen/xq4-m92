@@ -538,7 +538,7 @@ body.tab-tk .mbar{display:none!important}
     }
     function updateMenuBox() {
       var tb = S.tb; if (!tb) return;
-      var c = withB(function () { return { rs: window.calc().rs, use: window.calc().use, why: window.calc().why, rec: window.calc().rec }; });
+      var c = withB(function () { var x = window.calc(); return { rs: x.rs, use: x.use, why: x.why, rec: x.rec, safeRed: x.safeRed || 0, normRed: x.normRed || 0, addG: x.addG || 0, remG: x.remG || 0 }; });
       var body = $("tkMenuBody");
       [].forEach.call(body.querySelectorAll("tr[data-i]"), function (tr) {
         var i = +tr.dataset.i, r = tb.rows[i], s = c.rs[i], d = dishById(r.dish); if (!r || !s) return;
@@ -554,13 +554,14 @@ body.tab-tk .mbar{display:none!important}
         var dl = tr.querySelector('[data-o="delta"]');
         dl.textContent = s.changed ? (s.unknown ? "?" : (s.delta > 0 ? "+" : s.delta < 0 ? "−" : "") + fm(Math.abs(s.delta), 2)) : "";
         dl.className = "r v int " + (s.delta > 0 ? "pos" : s.delta < 0 ? "neg" : "");
+        if (window.rzGstHtml) dl.insertAdjacentHTML("beforeend", window.rzGstHtml(s));
       });
       var n = $("tkMenuNote"), G = num(S.guests);
       if (!(S.mods || []).length) { n.hidden = true; return; }
       n.hidden = false; n.className = "note " + (c.use > 0 ? "warn" : "ok");
       n.textContent = c.use > 0
         ? "Доплата за изменения: " + fm(c.use) + " ₽ на гостя" + (G > 0 ? ", " + fm(c.use * G) + " ₽ на всех гостей" : "") + ". " + c.why
-        : c.why;
+        : c.why + (c.safeRed > 0 ? " Если гость просит скидку за убранное: не больше " + fm(c.safeRed) + " ₽ на гостя" + (G > 0 ? " (" + fm(c.safeRed * G) + " ₽ на всех)" : "") + ", иначе прибыль в рублях упадёт. В смету скидка не добавляется сама." : "");
     }
     function menuChanged() { syncMods(); renderRows(); update(); updateMenuBox(); }
     function tbRow(el) { var tr = el.closest("tr[data-i]"); return tr && S.tb ? { tr: tr, i: +tr.dataset.i, r: S.tb.rows[+tr.dataset.i] } : null; }

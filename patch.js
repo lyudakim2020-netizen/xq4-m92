@@ -76,5 +76,5 @@ try {
 } catch (e) {}
 // выбор блюда в строке меню подключается после основных скриптов
 document.addEventListener("DOMContentLoaded", function () {
-  ["choice.js", "group.js", "tk.js"].forEach(function (f) { var s = document.createElement("script"); s.src = f; s.async = false; document.body.appendChild(s); });
+  ["choice.js", "group.js", "ref.js", "tk.js"].forEach(function (f) { var s = document.createElement("script"); s.src = f; s.async = false; document.body.appendChild(s); });
 });
