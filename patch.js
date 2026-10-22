@@ -1,19 +1,19 @@
 // оставляем только типовые пакеты; настройки фуршета по умолчанию
 window.RIZZW_SEED.packages = window.RIZZW_SEED.packages.filter(p => p.kind === "package");
-window.RIZZW_SEED.rev = "2026-10-19T14:45:00Z";
-// 19.10: вернули прежние цены пакетов (как в банкетном меню 2026): Гриль 4 800, Дорадо 5 980, Лосось 7 200
+window.RIZZW_SEED.rev = "2026-10-22T16:30:00Z";
+// 22.10: цены пакетов по решению Люды: Гриль 5 300, Дорадо 6 400, Лосось 7 700 (19.10 временно были 4 800 / 5 980 / 7 200)
 (function () {
-  var P = { p1: 4800, p2: 5980, p3: 7200 };
+  var P = { p1: 5300, p2: 6400, p3: 7700 };
   window.RIZZW_SEED.packages.forEach(function (p) { if (P[p.id]) p.price = P[p.id]; });
   var G = window.RIZZW_SEED.groupPrice || {};
-  G["Банкет 1300"] = 4800; G["Банкет 1500"] = 5980; G["Банкет 1700"] = 7200;
+  G["Банкет 1300"] = 5300; G["Банкет 1500"] = 6400; G["Банкет 1700"] = 7700;
   window.RIZZW_SEED.groupPrice = G;
-  // один раз сбрасываем старые «ручные» цены из браузера, чтобы они не вернули 5 300 / 6 400 / 7 700
+  // один раз сбрасываем ручные цены пакетов из браузера, чтобы они не перебили новые
   try {
-    if (!localStorage.getItem("rizzw-prices-reset-1019")) {
+    if (!localStorage.getItem("rizzw-prices-reset-1022")) {
       var ov0 = JSON.parse(localStorage.getItem("rizzw-price-overrides") || "null");
       if (ov0) { delete ov0.p1; delete ov0.p2; delete ov0.p3; localStorage.setItem("rizzw-price-overrides", JSON.stringify(ov0)); }
-      localStorage.setItem("rizzw-prices-reset-1019", "1");
+      localStorage.setItem("rizzw-prices-reset-1022", "1");
     }
   } catch (e) {}
 })();
@@ -74,7 +74,15 @@ try {
   var _s = JSON.parse(localStorage.getItem("rizzw-banquet-calc-v1") || "null");
   if (_s && _s.db && _s.db.rev !== window.RIZZW_SEED.rev && Array.isArray(_s.db.banquets) && _s.db.banquets.length) window.RIZZW_SEED.banquets = _s.db.banquets;
 } catch (e) {}
+// собранные в конструкторе меню (индивидуальные пакеты) тоже не теряем при смене версии данных
+try {
+  var _s2 = JSON.parse(localStorage.getItem("rizzw-banquet-calc-v1") || "null");
+  if (_s2 && _s2.db && _s2.db.rev !== window.RIZZW_SEED.rev && Array.isArray(_s2.db.packages)) {
+    var _keep = _s2.db.packages.filter(function (p) { return p && p.kind === "custom"; });
+    if (_keep.length) window.RIZZW_SEED.packages = window.RIZZW_SEED.packages.concat(_keep);
+  }
+} catch (e) {}
 // выбор блюда в строке меню подключается после основных скриптов
 document.addEventListener("DOMContentLoaded", function () {
-  ["choice.js", "group.js", "ref.js", "tk.js"].forEach(function (f) { var s = document.createElement("script"); s.src = f; s.async = false; document.body.appendChild(s); });
+  ["choice.js", "group.js", "ref.js", "ct.js", "tk.js"].forEach(function (f) { var s = document.createElement("script"); s.src = f; s.async = false; document.body.appendChild(s); });
 });

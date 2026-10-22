@@ -677,7 +677,7 @@ body.tab-tk .mbar{display:none!important}
     showTab = function (t) {
       if (t === "tk") {
         document.querySelectorAll("nav.tabs button").forEach(function (b) { b.setAttribute("aria-selected", b.dataset.tab === "tk"); });
-        ["banq", "pkgs", "dish", "saved", "fur"].forEach(function (k) { var el = $("tab-" + k); if (el) el.hidden = true; document.body.classList.remove("tab-" + k); });
+        ["banq", "pkgs", "dish", "saved", "fur", "ct"].forEach(function (k) { var el = $("tab-" + k); if (el) el.hidden = true; document.body.classList.remove("tab-" + k); });
         $("tab-tk").hidden = false; document.body.classList.add("tab-tk");
         renderAll();
         try { localStorage.setItem(KEY + "-tab", "tk"); } catch (e) {}
