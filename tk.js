@@ -278,6 +278,13 @@ body.tab-tk .mbar{display:none!important}
 <div class="row"><button type="button" class="ghost" id="tkMenuAdd">+ Добавить блюдо сверх пакета</button><button type="button" id="tkMenuReset">Вернуть меню пакета</button></div>
 <p class="note" id="tkMenuNote" hidden></p>
 </details></div>
+<div class="panel"><details id="tkKitchen"><summary>Заявка на кухню: сколько готовить</summary>
+<p class="why" style="margin-top:10px" id="tkKitNote"></p>
+<div class="tw"><table style="min-width:420px">
+<thead><tr><th>Блюдо</th><th class="r">На гостя</th><th class="r">Всего</th></tr></thead>
+<tbody id="tkKitBody"></tbody></table></div>
+<div class="row" style="margin-top:10px"><button type="button" class="pri" id="tkKitPrint">Печать / PDF</button><span class="small muted">Без цен: можно отдавать кухне</span></div>
+</details></div>
 <div class="panel"><details id="tkPriceBox"><summary>Цены этого пакета под ключ</summary>
 <p class="why" style="margin-top:10px">Цены из ваших таблиц. Если они изменились, поправьте здесь: сохранится в этом браузере. Цена меню берётся из вкладки «Пакеты».</p>
 <div class="tw"><table id="tkPriceTbl" style="min-width:420px"></table></div>
@@ -419,8 +426,20 @@ body.tab-tk .mbar{display:none!important}
       ps.className = "note " + (S.showPrices ? "warn" : "ok");
       ps.textContent = S.showPrices ? "Гость увидит цены услуг и меню." : "Цены услуг скрыты: гость увидит только состав и итоговую сумму.";
       $("tkPrev").innerHTML = docHTML(buildDoc(c, { prices: S.showPrices, menu: S.showMenu }), { prices: S.showPrices, menu: S.showMenu });
+      kitPaint(c);
       store(LS, S);
       return c;
+    }
+    /* заявка на кухню: меню пакета с заменами × гостей (код в kitchen.js) */
+    function kitRows() { return S.tb && Array.isArray(S.tb.rows) ? S.tb.rows : []; }
+    function kitPaint(c) {
+      try {
+        if (!window.rzKit) return;
+        var G = num(S.guests), ls = window.rzKit.lines(kitRows(), G);
+        $("tkKitBody").innerHTML = ls.length ? window.rzKit.tbody(ls) : '<tr><td colspan="3" class="muted">Нет пакета меню с ценой.</td></tr>';
+        $("tkKitNote").textContent = (G > 0 ? "На " + fm(G) + " гостей. " : "Укажите количество гостей, и здесь появится «Всего». ") +
+          ((S.mods || []).length ? "Замены в меню уже учтены." : "Меню как в пакете: если гость заменит блюдо, заявка обновится сама.");
+      } catch (e) { if (window.console) console.error("tk kitchen", e); }
     }
     function docNow() { var c = calc(); var o = { prices: S.showPrices, menu: S.showMenu }; return { d: buildDoc(c, o), o: o }; }
 
@@ -656,6 +675,15 @@ body.tab-tk .mbar{display:none!important}
       store(LSP, TKP); renderPrices(); renderRows(); update(); toast("Цены как в таблице");
     });
 
+    $("tkKitPrint").addEventListener("click", function () {
+      if (!window.rzKit) return;
+      var c = calc(), parts = [];
+      if ((S.client || "").trim()) parts.push("Клиент: " + S.client.trim());
+      if (c.dt) parts.push("Дата мероприятия: " + fmtD(c.dt));
+      parts.push(HALLS[S.hall] + " · Гостей: " + (c.G > 0 ? fm(c.G) : "—"));
+      if (c.pk) parts.push("Меню: " + c.pk.name + ((S.mods || []).length ? " (с заменами)" : ""));
+      window.rzKit.print({ parts: parts, G: c.G, file: [(S.client || "").trim(), c.dt ? fmtD(c.dt) : ""].filter(Boolean).join(", ") }, window.rzKit.lines(kitRows(), c.G));
+    });
     $("tkPrint").addEventListener("click", function () { var x = docNow(); $("printArea").innerHTML = docHTML(x.d, x.o); window.print(); });
     $("tkCopy").addEventListener("click", function () {
       var x = docNow(), t = docText(x.d, x.o);

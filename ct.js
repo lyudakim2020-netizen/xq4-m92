@@ -39,6 +39,15 @@
 <thead><tr><th>Блюдо</th><th class="r">На гостя</th><th class="r int">Себест., ₽</th><th></th></tr></thead>
 <tbody id="ctBody"></tbody></table></div>
 </div>
+<div class="panel">
+<details id="ctKitchen"><summary>Заявка на кухню: сколько готовить</summary>
+<p class="why" style="margin-top:10px" id="ctKitNote"></p>
+<div class="tw"><table style="min-width:420px">
+<thead><tr><th>Блюдо</th><th class="r">На гостя</th><th class="r">Всего</th></tr></thead>
+<tbody id="ctKitBody"></tbody></table></div>
+<div class="row" style="margin-top:10px"><button type="button" class="pri" id="ctKitPrint">Печать / PDF</button><span class="small muted">Без цен: можно отдавать кухне</span></div>
+</details>
+</div>
 </div>
 <aside class="col sticky" aria-live="polite">
 <div class="panel int">
@@ -149,6 +158,20 @@
       $("ctCmp").innerHTML = '<b style="font-weight:600">Для сравнения</b>' + DB.packages.filter(function (p) { return p.kind === "package" && p.price > 0; }).map(function (p) {
         var s = pkgStats(p); return "<span>" + esc(p.name) + ": " + fm(p.price) + " ₽, фудкост " + pct(s.fc) + "</span>"; }).join("");
       $("ctGo").disabled = !S.rows.length || !(st.use > 0);
+      kitPaint();
+    }
+    /* заявка на кухню: меню × гостей (код в kitchen.js) */
+    function kitRows() {
+      return S.rows.map(function (r, i) { return { r: r, i: i, k: SECS.indexOf(r.sec) < 0 ? 99 : SECS.indexOf(r.sec) }; })
+        .sort(function (a, b) { return a.k - b.k || a.i - b.i; }).map(function (o) { return o.r; });
+    }
+    function kitPaint() {
+      try {
+        if (!window.rzKit) return;
+        var G = num(S.guests), ls = window.rzKit.lines(kitRows(), G);
+        $("ctKitBody").innerHTML = ls.length ? window.rzKit.tbody(ls) : '<tr><td colspan="3" class="muted">Меню пустое.</td></tr>';
+        $("ctKitNote").textContent = G > 0 ? "На " + fm(G) + " гостей. Количество на гостя из состава меню умножено на число гостей." : "Укажите количество гостей справа, и здесь появится «Всего».";
+      } catch (e) { if (window.console) console.error("ct kitchen", e); }
     }
     function renderAll() {
       renderBase(); renderGroups(); renderList(); renderRows();
@@ -188,6 +211,11 @@
     $("ctPrice").addEventListener("input", function (e) { S.price = num(e.target.value); persist(); paint(); });
     $("ctName").addEventListener("input", function (e) { S.name = e.target.value; persist(); });
     $("ctGuests").addEventListener("input", function (e) { S.guests = num(e.target.value); persist(); paint(); });
+    $("ctKitPrint").addEventListener("click", function () {
+      if (!window.rzKit) return;
+      var G = num(S.guests), nm = (S.name || "").trim() || "Своё меню";
+      window.rzKit.print({ parts: ["Меню: " + nm, "Гостей: " + (G > 0 ? fm(G) : "—")], G: G, file: nm }, window.rzKit.lines(kitRows(), G));
+    });
     $("ctGo").addEventListener("click", function () {
       var st = stats(); if (!S.rows.length || !(st.use > 0)) return;
       var p = DB.packages.find(function (x) { return x.id === S.pkgId; });
