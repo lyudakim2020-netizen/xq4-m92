@@ -22,7 +22,7 @@
     function extra(group,row){let g=extras.find(x=>x.name===group);if(!g){g={name:group,rows:[]};extras.push(g);}g.rows.push(row);}
     if(!fur){DB.services.forEach(x=>{const q=num(s.svc[x.id]);if(q>0)extra(x.grp,{name:x.name,qty:count(q,x.unit==="час"?"ч":x.unit==="шт"?"шт.":"усл."),price:x.price,amount:q*x.price});});
       s.custom.forEach(x=>{const q=num(x.qty),p=num(x.price);if(x.name&&fin(q)&&fin(p))extra("Дополнительные услуги",{name:x.name,qty:count(q,"усл."),price:p,amount:q*p});});}
-    if(c.beer.qty>0)extra("Напитки отдельно",{name:BEER.name+", "+BEER.portionMl+" мл",qty:count(c.beer.qty,"порц."),price:BEER.price,amount:c.beer.revenue});
+    if(c.beer.qty>0)extra("Напитки отдельно",{name:BEER.name+", "+BEER.portionMl+" мл · "+fm(BEER.price)+" ₽/порц.",qty:count(c.beer.qty,"порц."),price:BEER.price,amount:c.beer.revenue});
     const per=fur?c.price:c.perGuest, menu=c.menu, disc=fur?0:c.menu*c.disc;
     const summary=[{label:"Меню на одного гостя",value:per},{label:"Стоимость меню",value:menu}];
     if(disc>0)summary.push({label:"Скидка на меню",value:-disc});
