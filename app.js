@@ -53,9 +53,29 @@ function lineCost(dishId, g, pcs) {
 const d = dishById(dishId); if (!d || !fin(d.cost)) return NaN;
 return d.unit === "шт" ? (fin(pcs) ? pcs : 0) * d.cost : (fin(g) ? g : 0) / 1000 * d.cost;
 }
+// Отдельный справочник внутренних расходов: позиции не входят в гостевое меню.
+const SUPPLIES_CATALOG = [
+{id:"plates",name:"Тарелки",cost:10.94,qty:3},
+{id:"forks",name:"Вилки",cost:6.42,qty:3},
+{id:"champagne",name:"Бокал для шампанского",cost:15.61,qty:4},
+{id:"red-wine",name:"Бокал для красного вина",cost:11.39,qty:4},
+{id:"white-wine",name:"Бокал для белого вина",cost:11.39,qty:4},
+{id:"cutlery-set",name:"Набор: вилка / нож / салфетка",cost:7.20,qty:2},
+{id:"skewers",name:"Шпажки",cost:2.56,qty:12},
+{id:"salad-container",name:"Контейнер для салата",cost:18.72,qty:1},
+{id:"salad-container-2",name:"Контейнер для салата — второй",cost:21.76,qty:1},
+{id:"fruit-container",name:"Контейнер для фруктов",cost:33.13,qty:1}
+];
+function suppliesLines(state) {
+if (!state || !state.suppliesOn) return [];
+const rows = Array.isArray(state.suppliesRows) ? state.suppliesRows : [];
+const out = rows.map(r => ({name:r.name,qty:Math.max(0,num(r.qty)||0),cost:Math.max(0,num(r.cost)||0)}));
+const manual = num(state.suppliesCost);
+if (fin(manual) && manual > 0) out.push({name:"Расходники / посуда — без разбивки",qty:1,cost:manual});
+return out;
+}
 function suppliesCost(state) {
-const v = num(state && state.suppliesCost);
-return state && state.suppliesOn && fin(v) && v >= 0 ? v : 0;
+return suppliesLines(state).reduce((sum,r)=>sum + r.qty * r.cost,0);
 }
 function pkgStats(p) {
 let c = 0, miss = [], star = [], chk = [];

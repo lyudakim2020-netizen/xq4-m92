@@ -1,6 +1,6 @@
 // оставляем только типовые пакеты; настройки фуршета по умолчанию
 window.RIZZW_SEED.packages = window.RIZZW_SEED.packages.filter(p => p.kind === "package");
-window.RIZZW_SEED.rev = "2026-11-13-photo-cost-v2";
+window.RIZZW_SEED.rev = "2026-11-13-supplies-tea-v3";
 // 22.10: цены пакетов по решению Люды: Гриль 5 300, Дорадо 6 400, Лосось 7 700 (19.10 временно были 4 800 / 5 980 / 7 200)
 (function () {
   var P = { p1: 5300, p2: 6400, p3: 7700 };
@@ -187,7 +187,7 @@ Object.assign(window.RIZZW_SEED.settings, { furTarget: 16, furFloor: 17, furMin:
   // Напитки: стоимость одной порции из сообщения; объём не указан.
   [
     ["fn-lemon", "Лимон", 9], ["fn-coffee", "Кофе", 22],
-    ["fn-tea", "Чай", 48], ["fn-water", "Вода газ / без газа", 50]
+    ["fn-tea", "Чай", 2], ["fn-water", "Вода газ / без газа", 50]
   ].forEach(function (x) {
     S.dishes.push({ id: x[0], name: x[1] + " (порция)", group: "Напитки — Фуршет ноябрь", unit: "шт", cost: x[2] });
     menu.push({ dish: x[0], title: x[1], sec: "Напитки", g: 0, pcs: 1 });

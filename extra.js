@@ -4,7 +4,16 @@ document.head.insertAdjacentHTML("beforeend", `<style>
 @media (max-width:980px){.layout{grid-template-columns:1fr}}
 .kv>span:first-child{min-width:0}
 .fur-tbl{min-width:560px}
+.supplies-tbl .num{width:84px;max-width:100%}
 @media (max-width:640px){
+.supplies-tbl,.supplies-tbl tbody{display:block;min-width:0}
+.supplies-tbl thead{display:none}
+.supplies-tbl tr{display:grid;grid-template-columns:1fr 1fr auto auto;gap:4px;align-items:center;border-bottom:1px solid var(--line);padding:8px 0}
+.supplies-tbl td{border:0;padding:4px}
+.supplies-tbl td:first-child{grid-column:1/-1;font-weight:500}
+.supplies-tbl td:nth-child(2)::before{content:"Шт. на гостя";display:block;font-size:11px;color:var(--muted)}
+.supplies-tbl td:nth-child(3)::before{content:"₽ за шт.";display:block;font-size:11px;color:var(--muted)}
+.supplies-tbl td:nth-child(4)::before{content:"₽ на гостя";display:block;font-size:11px;color:var(--muted)}
 .fur-tbl,.fur-tbl tbody{display:block;min-width:0}
 .fur-tbl thead{display:none}
 .fur-tbl tr[data-f]{display:grid;grid-template-columns:1fr auto auto auto;align-items:center;border-bottom:1px solid var(--line);padding-block:4px}
@@ -81,6 +90,7 @@ const S = [["Блюдо", "Блюдо в Айко", "Себестоимость 
 B.rows.forEach((r, i) => { const s = c.rs[i], d = dishById(r.dish);
 S.push([r.title, d ? d.name : "", r.removed ? 0 : r2(s.cur), s.changed && !s.unknown ? r2(s.delta) : "", r.removed ? "убрано" : s.added ? "сверх пакета" : s.swapped ? "замена" : s.qtyChanged ? "граммовка" : ""]); });
 if (B.suppliesOn) S.push(["Расходники / посуда", "Только для нас", r2(suppliesCost(B)), "", "Внутренний расход"]);
+suppliesLines(B).forEach(r=>S.push([r.name, fm(r.qty)+" шт/гость × "+fm(r.cost,2)+" ₽/шт", r2(r.qty*r.cost), "", "Внутренний расход — детализация"]));
 S.push([]);
 [["Себестоимость пакета на гостя, ₽", r2(c.st.cost)], ["Фудкост пакета", pc1(c.F)], ["Разница себестоимости на гостя, ₽", r2(c.D)],
 ["Минимум доплаты, ₽", r2(c.min)], ["Норма доплаты, ₽", r2(c.nrm)], ["Потолок доплаты, ₽", fin(c.cap) ? r2(c.cap) : "нет"], ["Рекомендуемая доплата, ₽", r2(c.rec)], ["Взяли доплату, ₽", r2(c.use)],
@@ -311,6 +321,7 @@ XLSX.utils.book_append_sheet(wb, xSheet(furGuestRows(c), [48, 12, 6, 12, 6]), "�
 const S = [["Позиция", "Позиция в Айко", "На гостя", "Ед.", "Себестоимость за ед., ₽", "Себестоимость на гостя, ₽"]];
 FS.rows.forEach(r => { const d = dishById(r.dish); S.push([r.title, d ? d.name : "", num(r.qty), fUnit(d), d && fin(d.cost) ? d.cost : "нет цены", r2(fRowCost(r))]); });
 if (FS.suppliesOn) S.push(["Расходники / посуда", "Только для нас", 1, "на гостя", r2(suppliesCost(FS)), r2(suppliesCost(FS))]);
+suppliesLines(FS).forEach(r=>S.push([r.name,"Только для нас",r.qty,"шт",r2(r.cost),r2(r.qty*r.cost)]));
 S.push([], ["Себестоимость набора на гостя, ₽", "", "", "", "", r2(c.C)], ["Цена на гостя, ₽", "", "", "", "", r2(c.price)], ["Фудкост", "", "", "", "", c.price > 0 ? pc1(c.C / c.price) : ""],
 ["Целевая цена (фудкост " + fm(c.T * 100) + "%), ₽", "", "", "", "", r2(c.rec)], ["Нижняя граница (фудкост " + fm(c.FL * 100) + "%), ₽", "", "", "", "", r2(c.floorP)],
 ["Себестоимость на фуршет, ₽", "", "", "", "", c.G > 0 ? r2(c.C * c.G) : ""], ["Валовая прибыль по еде, ₽", "", "", "", "", fin(c.menu) && c.G > 0 ? r2(c.menu - c.C * c.G) : ""]);
@@ -325,21 +336,31 @@ $("fPrint").onclick = () => { $("printArea").innerHTML = `<pre style="font-famil
 /* Внутренний расход хранится отдельно от блюд и услуг для гостя. */
 (function () {
   function panel(prefix) {
-    return `<div class="panel int" id="${prefix}SuppliesPanel"><h2>Внутренние расходы</h2>
+    return `<div class="panel int" id="${prefix}SuppliesPanel"><h2>Расходники / посуда</h2>
 <button type="button" class="ghost" id="${prefix}SuppliesAdd">+ Расходники / посуда</button>
 <div id="${prefix}SuppliesRow" hidden>
-<label class="f" for="${prefix}SuppliesCost">Расходники / посуда, ₽ на гостя<input id="${prefix}SuppliesCost" class="num" type="number" min="0" step="0.01" inputmode="decimal" placeholder="Введите себестоимость"></label>
+<p class="small muted">Количество на одного гостя. Стоимость указана за штуку.</p>
+<div class="tw"><table class="supplies-tbl"><thead><tr><th>Позиция</th><th>Шт. на гостя</th><th>₽ за шт.</th><th>₽ на гостя</th><th></th></tr></thead><tbody id="${prefix}SuppliesBody"></tbody></table></div>
+<div class="row"><label class="f" for="${prefix}SuppliesPick">Добавить позицию<select id="${prefix}SuppliesPick"><option value="">Выбрать…</option>${SUPPLIES_CATALOG.map(r=>`<option value="${r.id}">${esc(r.name)}</option>`).join("")}</select></label>
+<button type="button" class="ghost" id="${prefix}SuppliesSet">Взять весь набор с фото</button></div>
+<label class="f" for="${prefix}SuppliesCost">Дополнительно без разбивки, ₽ на гостя<input id="${prefix}SuppliesCost" class="num" type="number" min="0" step="0.01" inputmode="decimal" placeholder="0"></label>
+<div class="kv"><span>Набор на одного гостя</span><span id="${prefix}SuppliesPerGuest"></span></div>
 <div class="kv"><span>На всё мероприятие</span><span id="${prefix}SuppliesTotal"></span></div>
 <p class="small muted">Только для нас. Учитывается в себестоимости и фудкосте.</p>
 <button type="button" class="ghost" id="${prefix}SuppliesRemove">Убрать расход</button></div></div>`;
   }
-  $("tab-banq").querySelector(".col").insertAdjacentHTML("beforeend", panel("b"));
+  $("svcBody").closest(".panel").insertAdjacentHTML("beforebegin", panel("b"));
   $("tab-fur").querySelector(".col").insertAdjacentHTML("beforeend", panel("f"));
   function render(prefix, state, guests) {
     $(prefix + "SuppliesAdd").hidden = !!state.suppliesOn;
     $(prefix + "SuppliesRow").hidden = !state.suppliesOn;
     const input = $(prefix + "SuppliesCost");
     if (document.activeElement !== input) input.value = fin(num(state.suppliesCost)) ? state.suppliesCost : "";
+    const rows = Array.isArray(state.suppliesRows) ? state.suppliesRows : [];
+    const body = $(prefix + "SuppliesBody");
+    if (!body.contains(document.activeElement)) body.innerHTML = rows.map((r,i)=>`<tr data-supply="${i}"><td>${esc(r.name)}</td><td><input class="num" type="number" min="0" step="1" inputmode="numeric" data-field="qty" value="${esc(r.qty)}" aria-label="Количество: ${esc(r.name)}"></td><td><input class="num" type="number" min="0" step="0.01" inputmode="decimal" data-field="cost" value="${esc(r.cost)}" aria-label="Стоимость: ${esc(r.name)}"></td><td class="r" data-supply-sum>${fm(Math.max(0,num(r.qty)||0)*Math.max(0,num(r.cost)||0),2)}</td><td><button type="button" class="icon" data-supply-delete aria-label="Убрать: ${esc(r.name)}">✕</button></td></tr>`).join("");
+    body.querySelectorAll("tr[data-supply]").forEach(tr=>{const r=rows[+tr.dataset.supply];tr.querySelector("[data-supply-sum]").textContent=fm(Math.max(0,num(r.qty)||0)*Math.max(0,num(r.cost)||0),2);});
+    $(prefix + "SuppliesPerGuest").textContent = rub(suppliesCost(state),2);
     $(prefix + "SuppliesTotal").textContent = guests > 0 ? rub(suppliesCost(state) * guests, 2) : "—";
   }
   const prevRecalc = recalc;
@@ -349,7 +370,15 @@ $("fPrint").onclick = () => { $("printArea").innerHTML = `<pre style="font-famil
   ["b", "f"].forEach(prefix => {
     const state = () => prefix === "b" ? B : FS;
     const update = () => prefix === "b" ? recalc() : furCalc();
-    $(prefix + "SuppliesAdd").onclick = () => { state().suppliesOn = true; update(); $(prefix + "SuppliesCost").focus(); };
+    $(prefix + "SuppliesAdd").onclick = () => {
+      const s=state(); s.suppliesOn=true;
+      if (!Array.isArray(s.suppliesRows)) s.suppliesRows = suppliesCost(s)>0 ? [] : clone(SUPPLIES_CATALOG);
+      update();
+    };
+    $(prefix + "SuppliesSet").onclick = () => {state().suppliesRows=clone(SUPPLIES_CATALOG);state().suppliesCost="";update();};
+    $(prefix + "SuppliesPick").onchange = e => {const row=SUPPLIES_CATALOG.find(r=>r.id===e.target.value);if(row){state().suppliesRows=state().suppliesRows||[];state().suppliesRows.push(clone(row));update();}e.target.value="";};
+    $(prefix + "SuppliesBody").oninput = e => {const tr=e.target.closest("tr[data-supply]");if(tr && e.target.dataset.field){state().suppliesRows[+tr.dataset.supply][e.target.dataset.field]=e.target.value;update();}};
+    $(prefix + "SuppliesBody").onclick = e => {const button=e.target.closest("[data-supply-delete]");if(button){state().suppliesRows.splice(+button.closest("tr").dataset.supply,1);button.blur();update();}};
     $(prefix + "SuppliesRemove").onclick = () => { state().suppliesOn = false; update(); };
     $(prefix + "SuppliesCost").oninput = e => { state().suppliesCost = e.target.value; update(); };
   });
