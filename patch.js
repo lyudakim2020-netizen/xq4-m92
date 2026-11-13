@@ -1,6 +1,6 @@
 // оставляем только типовые пакеты; настройки фуршета по умолчанию
 window.RIZZW_SEED.packages = window.RIZZW_SEED.packages.filter(p => p.kind === "package");
-window.RIZZW_SEED.rev = "2026-11-13-supplies-tea-v3";
+window.RIZZW_SEED.rev = "2026-11-13-shrimp-v4";
 // 22.10: цены пакетов по решению Люды: Гриль 5 300, Дорадо 6 400, Лосось 7 700 (19.10 временно были 4 800 / 5 980 / 7 200)
 (function () {
   var P = { p1: 5300, p2: 6400, p3: 7700 };
@@ -172,6 +172,7 @@ Object.assign(window.RIZZW_SEED.settings, { furTarget: 16, furFloor: 17, furMin:
     "photo": 33.17
   }
 ];
+  menu.push({dish:"fn-shrimp-canape",title:"Канапе с креветкой",sec:"Закуски",pcs:1,g:0,photo:18,newDish:true});
   menu.forEach(function (l) {
     var d = S.dishes.find(function (x) { return x.id === l.dish; });
     var unitCost = l.pcs ? l.photo : l.photo * 1000 / l.g;
@@ -205,6 +206,24 @@ Object.assign(window.RIZZW_SEED.settings, { furTarget: 16, furFloor: 17, furMin:
     lines: menu.map(function (l) { var row = { sec: l.sec, title: l.title, dish: l.dish, g: l.g }; if (l.pcs) row.pcs = l.pcs; return row; })
   });
 })();
+// Добавляем новую позицию в открытый расчёт этого пакета, сохраняя остальные правки.
+// Сохранённые исторические банкеты не меняем. После ручного удаления повторно не добавляем.
+try {
+  var shrimpFlag = "rizzw-shrimp-added-20261113";
+  if (!localStorage.getItem(shrimpFlag)) {
+    var shrimpState = JSON.parse(localStorage.getItem("rizzw-banquet-calc-v1") || "null");
+    if (shrimpState && shrimpState.cur && shrimpState.cur.pkg === "p-furshet-november" && Array.isArray(shrimpState.cur.rows) && !shrimpState.cur.rows.some(function(r){return r.dish === "fn-shrimp-canape";})) {
+      shrimpState.cur.rows.push({sec:"Закуски",title:"Канапе с креветкой",dish:"fn-shrimp-canape",g:0,pcs:1,base:{dish:"fn-shrimp-canape",g:0,pcs:1},removed:false});
+      localStorage.setItem("rizzw-banquet-calc-v1",JSON.stringify(shrimpState));
+    }
+    var shrimpFur = JSON.parse(localStorage.getItem("rizzw-banquet-calc-v1-fur") || "null");
+    if (shrimpFur && shrimpFur.packageId === "p-furshet-november" && Array.isArray(shrimpFur.rows) && !shrimpFur.rows.some(function(r){return r.dish === "fn-shrimp-canape";})) {
+      shrimpFur.rows.push({dish:"fn-shrimp-canape",title:"Канапе с креветкой",qty:1});
+      localStorage.setItem("rizzw-banquet-calc-v1-fur",JSON.stringify(shrimpFur));
+    }
+    localStorage.setItem(shrimpFlag,"1");
+  }
+} catch (e) {}
 // цены пакетов, которые вы задали сами (вкладка «Пакеты»), не пропадают при обновлении калькулятора
 try {
   var _ov = JSON.parse(localStorage.getItem("rizzw-price-overrides") || "null");
