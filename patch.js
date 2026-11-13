@@ -224,6 +224,16 @@ try {
     localStorage.setItem(shrimpFlag,"1");
   }
 } catch (e) {}
+// 13.11: аренда мармитов — внутренний расход 13 000 руб. на открытое мероприятие.
+try {
+  if (!localStorage.getItem("rizzw-marmite-added-20261113")) {
+    var rentalState=JSON.parse(localStorage.getItem("rizzw-banquet-calc-v1")||"null");
+    if(rentalState && rentalState.cur && rentalState.cur.pkg==="p-furshet-november" && rentalState.cur.marmiteRent==null){rentalState.cur.marmiteRent=13000;rentalState.cur.suppliesOn=true;localStorage.setItem("rizzw-banquet-calc-v1",JSON.stringify(rentalState));}
+    var rentalFur=JSON.parse(localStorage.getItem("rizzw-banquet-calc-v1-fur")||"null");
+    if(rentalFur && rentalFur.packageId==="p-furshet-november" && rentalFur.marmiteRent==null){rentalFur.marmiteRent=13000;rentalFur.suppliesOn=true;localStorage.setItem("rizzw-banquet-calc-v1-fur",JSON.stringify(rentalFur));}
+    localStorage.setItem("rizzw-marmite-added-20261113","1");
+  }
+} catch(e) {}
 // цены пакетов, которые вы задали сами (вкладка «Пакеты»), не пропадают при обновлении калькулятора
 try {
   var _ov = JSON.parse(localStorage.getItem("rizzw-price-overrides") || "null");

@@ -75,7 +75,12 @@ if (fin(manual) && manual > 0) out.push({name:"Расходники / посуд
 return out;
 }
 function suppliesCost(state) {
-return suppliesLines(state).reduce((sum,r)=>sum + r.qty * r.cost,0);
+const perGuest = suppliesLines(state).reduce((sum,r)=>sum + r.qty * r.cost,0);
+const guests = num(state && state.guests);
+return perGuest + (guests > 0 ? marmiteCost(state)/guests : 0);
+}
+function marmiteCost(state) {
+return state && state.suppliesOn ? Math.max(0,num(state.marmiteRent)||0) : 0;
 }
 const BEER = {name:"Пиво Домодедовское",portionMl:500,price:400,costPerLitre:130};
 function beerCalc(state) {
@@ -275,6 +280,7 @@ $("rowChg").hidden = !dt; if (dt) $("tChg").textContent = fmtD(minusWork(dt, num
 $("mRec").textContent = rub(fin(c.man) ? c.man : c.rec); $("mTot").textContent = rub(c.total);
 $("iCost").textContent = rub(c.foodOnlyCost,2); $("iFc").textContent = pct(c.fcFood); $("iGp").textContent = rub(c.gp,2);
 $("iSupplies").textContent = rub(c.suppliesTotal,2);
+$("iMarmite").textContent = rub(marmiteCost(B),2);
 $("iBeerCost").textContent = rub(c.beer.cost,2);
 $("iBeerRevenue").textContent = rub(c.beer.revenue,2);
 $("iBeerRemainder").textContent = rub(c.beer.revenue-c.beer.cost,2);

@@ -92,6 +92,7 @@ B.rows.forEach((r, i) => { const s = c.rs[i], d = dishById(r.dish);
 S.push([r.title, d ? d.name : "", r.removed ? 0 : r2(s.cur), s.changed && !s.unknown ? r2(s.delta) : "", r.removed ? "убрано" : s.added ? "сверх пакета" : s.swapped ? "замена" : s.qtyChanged ? "граммовка" : ""]); });
 if (B.suppliesOn) S.push(["Расходники / посуда", "Только для нас", r2(suppliesCost(B)), "", "Внутренний расход"]);
 suppliesLines(B).forEach(r=>S.push([r.name, fm(r.qty)+" шт/гость × "+fm(r.cost,2)+" ₽/шт", r2(r.qty*r.cost), "", "Внутренний расход — детализация"]));
+if(marmiteCost(B)>0) S.push(["Аренда мармитов", "На всё мероприятие: "+fm(marmiteCost(B),2)+" ₽", c.G>0 ? r2(marmiteCost(B)/c.G) : "", "", "Внутренний расход"]);
 if(c.beer.qty > 0) S.push([BEER.name+" — себестоимость",fm(c.beer.qty)+" порц. × "+fm(BEER.costPerLitre*BEER.portionMl/1000)+" ₽",r2(c.beer.cost)], [BEER.name+" — выручка", "",r2(c.beer.revenue)], [BEER.name+" — остаток после себестоимости", "",r2(c.beer.revenue-c.beer.cost)]);
 S.push([]);
 [["Себестоимость пакета на гостя, ₽", r2(c.st.cost)], ["Фудкост пакета", pc1(c.F)], ["Разница себестоимости на гостя, ₽", r2(c.D)],
@@ -152,10 +153,11 @@ $("tab-saved").insertAdjacentHTML("afterend", `<section id="tab-fur" class="layo
 <div class="big"><span class="lbl">Цена на гостя при целевом фудкосте</span><span class="val" id="fTarget">—</span><span class="sub" id="fTargetTot"></span></div>
 <div class="blk">
 <div class="kv sm"><span>Еда и напитки на гостя</span><span id="fFoodC"></span></div>
-<div class="kv sm"><span>Расходники / посуда на гостя</span><span id="fSuppliesC"></span></div>
+<div class="kv sm"><span>Посуда и аренда на гостя</span><span id="fSuppliesC"></span></div>
 <div class="kv"><span>Всего прямые затраты на гостя</span><span id="fC"></span></div>
 <div class="kv sm"><span>Еда и напитки на мероприятие</span><span id="fFoodTotal"></span></div>
-<div class="kv sm"><span>Посуда на мероприятие</span><span id="fSuppliesEvent"></span></div>
+<div class="kv sm"><span>Посуда и аренда на мероприятие</span><span id="fSuppliesEvent"></span></div>
+<div class="kv sm"><span>В том числе аренда мармитов</span><span id="fMarmiteEvent"></span></div>
 <div class="kv"><span>Всего прямые затраты на мероприятие</span><span id="fDirectTotal"></span></div>
 <div class="kv sm"><span>Пиво — себестоимость</span><span id="fBeerCost"></span></div>
 <div class="kv sm"><span>Пиво — выручка</span><span id="fBeerRevenue"></span></div>
@@ -256,6 +258,7 @@ $("fFoodC").textContent = rub(foodPer,2);
 $("fSuppliesC").textContent = rub(suppliesPer,2);
 $("fFoodTotal").textContent = G > 0 ? rub(foodPer*G,2) : "—";
 $("fSuppliesEvent").textContent = G > 0 ? rub(suppliesPer*G,2) : "—";
+$("fMarmiteEvent").textContent = rub(marmiteCost(FS),2);
 $("fDirectTotal").textContent = G > 0 ? rub(C*G+beer.cost,2) : "—";
 $("fBeerCost").textContent = rub(beer.cost,2);
 $("fBeerRevenue").textContent = rub(beer.revenue,2);
@@ -354,6 +357,7 @@ const S = [["Позиция", "Позиция в Айко", "На гостя", "
 FS.rows.forEach(r => { const d = dishById(r.dish); S.push([r.title, d ? d.name : "", num(r.qty), fUnit(d), d && fin(d.cost) ? d.cost : "нет цены", r2(fRowCost(r))]); });
 if (FS.suppliesOn) S.push(["Расходники / посуда", "Только для нас", 1, "на гостя", r2(suppliesCost(FS)), r2(suppliesCost(FS))]);
 suppliesLines(FS).forEach(r=>S.push([r.name,"Только для нас",r.qty,"шт",r2(r.cost),r2(r.qty*r.cost)]));
+if(marmiteCost(FS)>0) S.push(["Аренда мармитов","На всё мероприятие: "+fm(marmiteCost(FS),2)+" ₽",1,"мероприятие",marmiteCost(FS),c.G>0?r2(marmiteCost(FS)/c.G):""]);
 if(c.beer.qty>0) S.push([BEER.name+" — себестоимость","Только для нас",c.beer.qty,"порц.",BEER.costPerLitre*BEER.portionMl/1000,r2(c.beer.cost)], [BEER.name+" — выручка","", "", "", "",r2(c.beer.revenue)], [BEER.name+" — остаток после себестоимости","", "", "", "",r2(c.beer.revenue-c.beer.cost)]);
 S.push([], ["Себестоимость набора на гостя, ₽", "", "", "", "", r2(c.C)], ["Цена на гостя, ₽", "", "", "", "", r2(c.price)], ["Фудкост", "", "", "", "", c.price > 0 ? pc1(c.C / c.price) : ""],
 ["Целевая цена (фудкост " + fm(c.T * 100) + "%), ₽", "", "", "", "", r2(c.rec)], ["Нижняя граница (фудкост " + fm(c.FL * 100) + "%), ₽", "", "", "", "", r2(c.floorP)],
@@ -398,7 +402,9 @@ $("fPrint").onclick = () => { $("printArea").innerHTML = `<pre style="font-famil
 <div class="row"><label class="f" for="${prefix}SuppliesPick">Добавить позицию<select id="${prefix}SuppliesPick"><option value="">Выбрать…</option>${SUPPLIES_CATALOG.map(r=>`<option value="${r.id}">${esc(r.name)}</option>`).join("")}</select></label>
 <button type="button" class="ghost" id="${prefix}SuppliesSet">Взять весь набор с фото</button></div>
 <label class="f" for="${prefix}SuppliesCost">Дополнительно без разбивки, ₽ на гостя<input id="${prefix}SuppliesCost" class="num" type="number" min="0" step="0.01" inputmode="decimal" placeholder="0"></label>
-<div class="kv"><span>Набор на одного гостя</span><span id="${prefix}SuppliesPerGuest"></span></div>
+<div class="blk"><label class="f" for="${prefix}MarmiteRent">Аренда мармитов, ₽ на всё мероприятие<input id="${prefix}MarmiteRent" class="num" type="number" min="0" step="0.01" inputmode="decimal" placeholder="0"></label>
+<button type="button" class="ghost" id="${prefix}MarmiteAdd">Аренда мармитов — 13 000 ₽</button></div>
+<div class="kv"><span>Посуда и аренда на одного гостя</span><span id="${prefix}SuppliesPerGuest"></span></div>
 <div class="kv"><span>На всё мероприятие</span><span id="${prefix}SuppliesTotal"></span></div>
 <p class="small muted">Только для нас. Учитывается в себестоимости и фудкосте.</p>
 <button type="button" class="ghost" id="${prefix}SuppliesRemove">Убрать расход</button></div></div>`;
@@ -410,6 +416,7 @@ $("fPrint").onclick = () => { $("printArea").innerHTML = `<pre style="font-famil
     $(prefix + "SuppliesRow").hidden = !state.suppliesOn;
     const input = $(prefix + "SuppliesCost");
     if (document.activeElement !== input) input.value = fin(num(state.suppliesCost)) ? state.suppliesCost : "";
+    const rentalInput=$(prefix+"MarmiteRent");if(document.activeElement!==rentalInput)rentalInput.value=num(state.marmiteRent)>0?state.marmiteRent:"";
     const rows = Array.isArray(state.suppliesRows) ? state.suppliesRows : [];
     const body = $(prefix + "SuppliesBody");
     if (!body.contains(document.activeElement)) body.innerHTML = rows.map((r,i)=>`<tr data-supply="${i}"><td>${esc(r.name)}</td><td><input class="num" type="number" min="0" step="1" inputmode="numeric" data-field="qty" value="${esc(r.qty)}" aria-label="Количество: ${esc(r.name)}"></td><td><input class="num" type="number" min="0" step="0.01" inputmode="decimal" data-field="cost" value="${esc(r.cost)}" aria-label="Стоимость: ${esc(r.name)}"></td><td class="r" data-supply-sum>${fm(Math.max(0,num(r.qty)||0)*Math.max(0,num(r.cost)||0),2)}</td><td><button type="button" class="icon" data-supply-delete aria-label="Убрать: ${esc(r.name)}">✕</button></td></tr>`).join("");
@@ -435,6 +442,8 @@ $("fPrint").onclick = () => { $("printArea").innerHTML = `<pre style="font-famil
     $(prefix + "SuppliesBody").onclick = e => {const button=e.target.closest("[data-supply-delete]");if(button){state().suppliesRows.splice(+button.closest("tr").dataset.supply,1);button.blur();update();}};
     $(prefix + "SuppliesRemove").onclick = () => { state().suppliesOn = false; update(); };
     $(prefix + "SuppliesCost").oninput = e => { state().suppliesCost = e.target.value; update(); };
+    $(prefix + "MarmiteRent").oninput = e => {state().marmiteRent=e.target.value;update();};
+    $(prefix + "MarmiteAdd").onclick = () => {state().marmiteRent=13000;update();};
   });
   render("b", B, num(B.guests)); render("f", FS, num(FS.guests));
 })();
