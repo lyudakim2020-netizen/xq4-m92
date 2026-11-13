@@ -125,7 +125,7 @@ $("tab-saved").insertAdjacentHTML("afterend", `<section id="tab-fur" class="layo
 </div>
 <div class="panel">
 <div class="row between"><h2>Набор на одного гостя</h2><span class="small muted">Лишнее уберите крестиком, количество поправьте</span></div>
-<div class="tw"><table class="fur-tbl">
+<label class="f" for="fPackage">Готовый пакет<select id="fPackage"><option value="">Выбрать состав…</option></select></label>\n<div class="tw"><table class="fur-tbl">
 <thead><tr><th>Позиция</th><th class="r">На гостя</th><th class="r">Всего</th><th class="r int">Себест., ₽</th><th></th></tr></thead>
 <tbody id="fBody"></tbody>
 <tfoot class="int"><tr><td colspan="3"><b>Себестоимость набора на гостя</b></td><td class="r v" id="fCostTot"></td><td></td></tr></tfoot>
@@ -185,6 +185,7 @@ const fRowCost = r => lineCost(r.dish, r.qty, r.qty);
 
 function furRender() {
 fillDishList();
+$("fPackage").innerHTML = '<option value="">Выбрать состав…</option>' + DB.packages.filter(p => p.buffet).map(p => `<option value="${esc(p.id)}"${FS.packageId === p.id ? " selected" : ""}>${esc(p.name)}</option>`).join("");
 $("fClient").value = FS.client || ""; $("fDate").value = FS.date || ""; $("fGuests").value = fin(num(FS.guests)) ? FS.guests : "";
 $("fPrice").value = fin(num(FS.price)) ? FS.price : ""; $("fBudget").value = fin(num(FS.budget)) ? FS.budget : ""; $("fSvcOn").checked = !!FS.svcOn;
 ["furTarget", "furFloor", "furMin"].forEach(k => { const el = document.querySelector(`[data-fs="${k}"]`); el.value = fin(num(DB.settings[k])) && num(DB.settings[k]) > 0 ? DB.settings[k] : ""; });
@@ -197,6 +198,14 @@ return `<tr data-f="${i}">
 <td class="r"><button type="button" class="icon" data-act="del" aria-label="Убрать позицию">✕</button></td></tr>`; }).join("") || `<tr><td colspan="5" class="muted">Добавьте позиции фуршета.</td></tr>`;
 furCalc();
 }
+$("fPackage").addEventListener("change", function () {
+  const p = DB.packages.find(x => x.id === this.value && x.buffet);
+  if (!p) return;
+  FS.packageId = p.id;
+  FS.rows = p.lines.map(l => ({ dish: l.dish, title: l.title, qty: dishById(l.dish)?.unit === "шт" ? l.pcs : l.g }));
+  FS.price = p.price > 0 ? p.price : NaN;
+  fsave(); furRender();
+});
 function furCalc() {
 const G = num(FS.guests), S = DB.settings;
 const T = (num(S.furTarget) || 16) / 100, FL = (num(S.furFloor) || 17) / 100, M = num(S.furMin) > 0 ? num(S.furMin) : 0;

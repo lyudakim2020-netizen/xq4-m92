@@ -1,6 +1,6 @@
 // оставляем только типовые пакеты; настройки фуршета по умолчанию
 window.RIZZW_SEED.packages = window.RIZZW_SEED.packages.filter(p => p.kind === "package");
-window.RIZZW_SEED.rev = "2026-10-22T16:30:00Z";
+window.RIZZW_SEED.rev = "2026-11-13T17:00:00Z";
 // 22.10: цены пакетов по решению Люды: Гриль 5 300, Дорадо 6 400, Лосось 7 700 (19.10 временно были 4 800 / 5 980 / 7 200)
 (function () {
   var P = { p1: 5300, p2: 6400, p3: 7700 };
@@ -59,6 +59,150 @@ Object.assign(window.RIZZW_SEED.settings, { furTarget: 16, furFloor: 17, furMin:
   p.note = "Меню 1650 г заявлено. Каждый гость выбирает одно горячее из пяти (Рибай, ягнёнок, лосось, тунец, утка) и один гарнир из трёх. Салат тоже на выбор: один из трёх на гостя (порция 150 г, уточняется: 150 или 200). Во вкладке «Банкет» укажите, сколько порций чего. В цене пакета заложены самые дорогие варианты (Рибай, салат с ростбифом, спаржа). Граммовку порций проверьте. Цена пока не задана.";
 })();
 Object.assign(window.RIZZW_SEED.settings, { furTarget: 16, furFloor: 17, furMin: 0 });
+// 13.11.2026: «Фуршет ноябрь», состав и порции с фото Люды.
+// Сравниваем себестоимость на одинаковую единицу (шт. или кг) и берём большую.
+(function () {
+  var S = window.RIZZW_SEED;
+  var menu = [
+  {
+    "dish": "d79",
+    "title": "Канапе блин-ролл с лососем",
+    "sec": "Закуски",
+    "pcs": 1,
+    "g": 0,
+    "photo": 31.14
+  },
+  {
+    "dish": "d81",
+    "title": "Канапе тортилья с курицей",
+    "sec": "Закуски",
+    "pcs": 1,
+    "g": 0,
+    "photo": 18.14
+  },
+  {
+    "dish": "fn-camembert-grape",
+    "title": "Канапе камамбер с виноградом",
+    "sec": "Закуски",
+    "pcs": 1,
+    "g": 0,
+    "photo": 42.15,
+    "newDish": true
+  },
+  {
+    "dish": "d71",
+    "title": "Брускетта с ростбифом",
+    "sec": "Закуски",
+    "pcs": 2,
+    "g": 0,
+    "photo": 46.06
+  },
+  {
+    "dish": "d72",
+    "title": "Брускетта с чатни помодорро",
+    "sec": "Закуски",
+    "pcs": 2,
+    "g": 0,
+    "photo": 11.89
+  },
+  {
+    "dish": "d75",
+    "title": "Канапе мини капрезе",
+    "sec": "Закуски",
+    "pcs": 1,
+    "g": 0,
+    "photo": 37.26
+  },
+  {
+    "dish": "d5",
+    "title": "Маслины / оливки",
+    "sec": "Закуски",
+    "g": 30,
+    "photo": 43.74
+  },
+  {
+    "dish": "d17",
+    "title": "Фруктовая ваза",
+    "sec": "Фрукты",
+    "g": 100,
+    "photo": 40.1
+  },
+  {
+    "dish": "d18",
+    "title": "Шашлык куриный",
+    "sec": "Основное блюдо",
+    "g": 100,
+    "photo": 41.5
+  },
+  {
+    "dish": "fn-turkey-sausages",
+    "title": "Колбаски из индейки",
+    "sec": "Основное блюдо",
+    "g": 100,
+    "photo": 48,
+    "newDish": true
+  },
+  {
+    "dish": "d38",
+    "title": "Овощи на гриле",
+    "sec": "Гарнир",
+    "g": 75,
+    "photo": 25.35
+  },
+  {
+    "dish": "d2",
+    "title": "Картофель мини пряный",
+    "sec": "Гарнир",
+    "g": 75,
+    "photo": 5.5
+  },
+  {
+    "dish": "d29",
+    "title": "Салат Цезарь с курицей",
+    "sec": "Салаты",
+    "g": 50,
+    "photo": 26
+  },
+  {
+    "dish": "d9",
+    "title": "Салат Греческий",
+    "sec": "Салаты",
+    "g": 50,
+    "photo": 33.17
+  }
+];
+  menu.forEach(function (l) {
+    var d = S.dishes.find(function (x) { return x.id === l.dish; });
+    var unitCost = l.pcs ? l.photo : l.photo * 1000 / l.g;
+    if (!d) {
+      d = { id: l.dish, name: l.title, group: "Легкие закуски/фуршет", unit: l.pcs ? "шт" : "кг", cost: unitCost };
+      S.dishes.push(d);
+    } else {
+      d.cost = Math.max(typeof d.cost === "number" ? d.cost : 0, unitCost);
+      if (l.pcs) delete d.unitGuess;
+    }
+  });
+  // Напитки: стоимость одной порции из сообщения; объём не указан.
+  [
+    ["fn-lemon", "Лимон", 9], ["fn-coffee", "Кофе", 22],
+    ["fn-tea", "Чай", 48], ["fn-water", "Вода газ / без газа", 50]
+  ].forEach(function (x) {
+    S.dishes.push({ id: x[0], name: x[1] + " (порция)", group: "Напитки — Фуршет ноябрь", unit: "шт", cost: x[2] });
+    menu.push({ dish: x[0], title: x[1], sec: "Напитки", g: 0, pcs: 1 });
+  });
+  S.dishes.push({ id: "fn-milk", name: "Молоко", group: "Напитки — Фуршет ноябрь", unit: "л", cost: 100 });
+  menu.push({ dish: "fn-milk", title: "Молоко", sec: "Напитки", g: 30 });
+  // Соусы: по 30 мл; себестоимость порции 8 и 12 рублей по сообщению Люды.
+  [["fn-ketchup", "Кетчуп", "Дополнительно", 8], ["fn-cheese-sauce", "Соус сырный", "Дополнительно", 12]].forEach(function (x) {
+    S.dishes.push({ id: x[0], name: x[1], group: "Фуршет ноябрь", unit: "л", cost: x[3] * 1000 / 30 });
+    menu.push({ dish: x[0], title: x[1], sec: x[2], g: 30 });
+  });
+  S.packages.push({
+    id: "p-furshet-november", name: "Фуршет ноябрь", price: 0, kind: "package", buffet: true,
+    note: "Порции на одного гостя. Брускетты с ростбифом и с чатни — по 2 штуки. Напитки — по одной порции на гостя. Молоко и каждый соус — по 30 мл. Цена договорная.",
+    lines: menu.map(function (l) { var row = { sec: l.sec, title: l.title, dish: l.dish, g: l.g }; if (l.pcs) row.pcs = l.pcs; return row; })
+  });
+})();
 // цены пакетов, которые вы задали сами (вкладка «Пакеты»), не пропадают при обновлении калькулятора
 try {
   var _ov = JSON.parse(localStorage.getItem("rizzw-price-overrides") || "null");
