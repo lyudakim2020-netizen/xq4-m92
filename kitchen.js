@@ -43,13 +43,37 @@
       window.print();
       return true;
     }
-    window.rzKit = { lines: lines, tbody: tbody, docHTML: docHTML, print: print };
+    async function download(meta, ls) {
+      if (!ls.length) { toast("В меню нет блюд: сохранять нечего"); return false; }
+      if (!(meta.G > 0)) { toast("Укажите количество гостей: без него «Всего» не посчитать"); return false; }
+      try {
+        if (!window.rzExport || !window.rzExport.pdfReady) throw new Error("Обновите страницу для сохранения PDF");
+        toast("Готовлю заявку на кухню…");
+        await window.rzExport.pdfReady();
+        var body = [[{text:"Блюдо",bold:true,fillColor:"#E7EBE9"},{text:"На гостя",bold:true,fillColor:"#E7EBE9",alignment:"right"},{text:"Всего",bold:true,fillColor:"#E7EBE9",alignment:"right"}]];
+        ls.forEach(function(l){body.push([l.name,{text:l.per,alignment:"right"},{text:l.tot,alignment:"right"}]);});
+        var doc = {
+          pageSize:"A4",pageMargins:[40,36,40,36],defaultStyle:{font:"Roboto",fontSize:10,color:"#17221E"},
+          content:[
+            {columns:[{text:"Заявка на кухню",fontSize:17,bold:true,width:"*"},{text:"RizzW",fontSize:25,bold:true,italics:true,color:"#244D40",alignment:"right",width:125}],margin:[0,0,0,14]},
+            {text:meta.parts.join("\n"),margin:[0,0,0,14],lineHeight:1.3},
+            {table:{headerRows:1,dontBreakRows:true,widths:["*",85,95],body:body},layout:{hLineWidth:function(){return .5;},vLineWidth:function(){return .5;},hLineColor:function(){return "#B8C2BE";},vLineColor:function(){return "#B8C2BE";},paddingTop:function(){return 5;},paddingBottom:function(){return 5;},paddingLeft:function(){return 7;},paddingRight:function(){return 7;}}}
+          ],
+          footer:function(p,pages){return {text:"RizzW · Заявка на кухню · "+p+" / "+pages,alignment:"right",fontSize:8,color:"#68756E",margin:[40,8,40,0]};},
+          info:{title:"Заявка на кухню",author:"RizzW"}
+        };
+        var file=("Заявка на кухню"+(meta.file?" — "+meta.file:"")).replace(/[\\/:*?"<>|]/g," ");
+        window.pdfMake.createPdf(doc).download(file+".pdf");
+        return true;
+      } catch(e) {toast(e.message||"Не удалось сохранить заявку");return false;}
+    }
+    window.rzKit = { lines: lines, tbody: tbody, docHTML: docHTML, print: print, download: download };
 
     /* ---------- вкладка «Банкет»: читаем заявку прямо с экрана (там уже учтён выбор по порциям в Люксе) ---------- */
     var box = $("kitchen");
     if (box) {
-      box.insertAdjacentHTML("beforeend", '<div class="row kitbar"><button type="button" class="pri" id="kitPrint">Печать / PDF</button><span class="small muted">Без цен: можно отдавать кухне</span></div>');
-      $("kitPrint").addEventListener("click", function () {
+      box.insertAdjacentHTML("beforeend", '<div class="row kitbar"><button type="button" class="pri" id="kitPrint">Печать</button><button type="button" id="kitDownload">Скачать PDF</button><span class="small muted">Без цен: можно отдавать кухне</span></div>');
+      function outputBanquet(downloadFile) {
         var ls = [].map.call($("kitBody").querySelectorAll("tr"), function (tr) {
           var td = tr.children; return { name: td[0].textContent, per: td[1].textContent, tot: td[2].textContent };
         });
@@ -58,8 +82,10 @@
         if (dt) parts.push("Дата мероприятия: " + fmtD(dt));
         parts.push("Гостей: " + (G > 0 ? fm(G) : "—"));
         if (p) parts.push("Меню: " + p.name);
-        window.rzKit.print({ parts: parts, G: G, file: [(B.client || "").trim(), dt ? fmtD(dt) : ""].filter(Boolean).join(", ") }, ls);
-      });
+        window.rzKit[downloadFile ? "download" : "print"]({ parts: parts, G: G, file: [(B.client || "").trim(), dt ? fmtD(dt) : ""].filter(Boolean).join(", ") }, ls);
+      }
+      $("kitPrint").addEventListener("click",function(){outputBanquet(false);});
+      $("kitDownload").addEventListener("click",function(){outputBanquet(true);});
     }
   } catch (err) {
     if (window.console) console.error("kitchen.js", err);

@@ -45,7 +45,7 @@
 <div class="tw"><table style="min-width:420px">
 <thead><tr><th>Блюдо</th><th class="r">На гостя</th><th class="r">Всего</th></tr></thead>
 <tbody id="ctKitBody"></tbody></table></div>
-<div class="row" style="margin-top:10px"><button type="button" class="pri" id="ctKitPrint">Печать / PDF</button><span class="small muted">Без цен: можно отдавать кухне</span></div>
+<div class="row" style="margin-top:10px"><button type="button" class="pri" id="ctKitPrint">Печать</button><button type="button" id="ctKitDownload">Скачать PDF</button><span class="small muted">Без цен: можно отдавать кухне</span></div>
 </details>
 </div>
 </div>
@@ -211,11 +211,13 @@
     $("ctPrice").addEventListener("input", function (e) { S.price = num(e.target.value); persist(); paint(); });
     $("ctName").addEventListener("input", function (e) { S.name = e.target.value; persist(); });
     $("ctGuests").addEventListener("input", function (e) { S.guests = num(e.target.value); persist(); paint(); });
-    $("ctKitPrint").addEventListener("click", function () {
+    function outputKitchen(downloadFile) {
       if (!window.rzKit) return;
       var G = num(S.guests), nm = (S.name || "").trim() || "Своё меню";
-      window.rzKit.print({ parts: ["Меню: " + nm, "Гостей: " + (G > 0 ? fm(G) : "—")], G: G, file: nm }, window.rzKit.lines(kitRows(), G));
-    });
+      window.rzKit[downloadFile?"download":"print"]({ parts: ["Меню: " + nm, "Гостей: " + (G > 0 ? fm(G) : "—")], G: G, file: nm }, window.rzKit.lines(kitRows(), G));
+    }
+    $("ctKitPrint").addEventListener("click",function(){outputKitchen(false);});
+    $("ctKitDownload").addEventListener("click",function(){outputKitchen(true);});
     $("ctGo").addEventListener("click", function () {
       var st = stats(); if (!S.rows.length || !(st.use > 0)) return;
       var p = DB.packages.find(function (x) { return x.id === S.pkgId; });

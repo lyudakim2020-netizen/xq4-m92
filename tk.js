@@ -283,7 +283,7 @@ body.tab-tk .mbar{display:none!important}
 <div class="tw"><table style="min-width:420px">
 <thead><tr><th>Блюдо</th><th class="r">На гостя</th><th class="r">Всего</th></tr></thead>
 <tbody id="tkKitBody"></tbody></table></div>
-<div class="row" style="margin-top:10px"><button type="button" class="pri" id="tkKitPrint">Печать / PDF</button><span class="small muted">Без цен: можно отдавать кухне</span></div>
+<div class="row" style="margin-top:10px"><button type="button" class="pri" id="tkKitPrint">Печать</button><button type="button" id="tkKitDownload">Скачать PDF</button><span class="small muted">Без цен: можно отдавать кухне</span></div>
 </details></div>
 <div class="panel"><details id="tkPriceBox"><summary>Цены этого пакета под ключ</summary>
 <p class="why" style="margin-top:10px">Цены из ваших таблиц. Если они изменились, поправьте здесь: сохранится в этом браузере. Цена меню берётся из вкладки «Пакеты».</p>
@@ -675,15 +675,17 @@ body.tab-tk .mbar{display:none!important}
       store(LSP, TKP); renderPrices(); renderRows(); update(); toast("Цены как в таблице");
     });
 
-    $("tkKitPrint").addEventListener("click", function () {
+    function outputKitchen(downloadFile) {
       if (!window.rzKit) return;
       var c = calc(), parts = [];
       if ((S.client || "").trim()) parts.push("Клиент: " + S.client.trim());
       if (c.dt) parts.push("Дата мероприятия: " + fmtD(c.dt));
       parts.push(HALLS[S.hall] + " · Гостей: " + (c.G > 0 ? fm(c.G) : "—"));
       if (c.pk) parts.push("Меню: " + c.pk.name + ((S.mods || []).length ? " (с заменами)" : ""));
-      window.rzKit.print({ parts: parts, G: c.G, file: [(S.client || "").trim(), c.dt ? fmtD(c.dt) : ""].filter(Boolean).join(", ") }, window.rzKit.lines(kitRows(), c.G));
-    });
+      window.rzKit[downloadFile?"download":"print"]({ parts: parts, G: c.G, file: [(S.client || "").trim(), c.dt ? fmtD(c.dt) : ""].filter(Boolean).join(", ") }, window.rzKit.lines(kitRows(), c.G));
+    }
+    $("tkKitPrint").addEventListener("click",function(){outputKitchen(false);});
+    $("tkKitDownload").addEventListener("click",function(){outputKitchen(true);});
     $("tkPrint").addEventListener("click", function () { var x = docNow(); $("printArea").innerHTML = docHTML(x.d, x.o); window.print(); });
     $("tkCopy").addEventListener("click", function () {
       var x = docNow(), t = docText(x.d, x.o);
