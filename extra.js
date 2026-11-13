@@ -47,13 +47,14 @@ recalc = function () { const c = _recalc(); if (!fin(c.cap)) $("sCap").textConte
 
 /* ---------- Excel ---------- */
 function loadXLSX(cb) {
-if (window.XLSX) return cb();
-const s = document.createElement("script"); s.src = "https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js";
-s.onload = cb; s.onerror = () => toast("Нет интернета: Excel не сформировать"); document.head.appendChild(s);
+const ready=()=>window.rzPrepareXlsx?rzPrepareXlsx().then(cb).catch(()=>toast("Не удалось загрузить компонент Excel")):cb();
+if (window.XLSX && window.XLSX.style_version) return ready();
+const s = document.createElement("script"); s.src = "vendor/xlsx.bundle.js";
+s.onload = ready; s.onerror = () => toast("Нет интернета: Excel не сформировать"); document.head.appendChild(s);
 }
 const r2 = v => fin(v) ? Math.round(v * 100) / 100 : "";
 const pc1 = v => fin(v) ? Math.round(v * 1000) / 10 + "%" : "";
-const xSheet = (rows, widths) => { const ws = XLSX.utils.aoa_to_sheet(rows); ws["!cols"] = widths.map(w => ({ wch: w })); return ws; };
+const xSheet = (rows, widths) => { const ws = XLSX.utils.aoa_to_sheet(rows); ws["!cols"] = widths.map(w => ({ wch: w })); if(window.rzStyleSheet) window.rzStyleSheet(ws,rows); return ws; };
 const safeName = s => String(s).replace(/[\[\]:*?\/\\]/g, " ").slice(0, 31);
 const fileSafe = s => String(s).replace(/[\\/:*?"<>|]/g, " ");
 function banqGuestRows(c) {
@@ -86,13 +87,13 @@ toast("Смета для гостя сохранена в Excel");
 }
 function internalXlsx() { // для нас: смета + себестоимость
 const c = calc(), wb = XLSX.utils.book_new();
-XLSX.utils.book_append_sheet(wb, xSheet(banqGuestRows(c), [16, 46, 12, 6, 16, 6]), "Смета");
+XLSX.utils.book_append_sheet(wb, window.rzGuestSheet && XLSX.style_version ? rzGuestSheet("banq") : xSheet(banqGuestRows(c), [16, 46, 12, 6, 16, 6]), "Смета");
 const S = [["Блюдо", "Блюдо в Айко", "Себестоимость на гостя, ₽", "Разница к пакету, ₽", "Изменение"]];
 B.rows.forEach((r, i) => { const s = c.rs[i], d = dishById(r.dish);
 S.push([r.title, d ? d.name : "", r.removed ? 0 : r2(s.cur), s.changed && !s.unknown ? r2(s.delta) : "", r.removed ? "убрано" : s.added ? "сверх пакета" : s.swapped ? "замена" : s.qtyChanged ? "граммовка" : ""]); });
-if (B.suppliesOn) S.push(["Расходники / посуда", "Только для нас", r2(suppliesCost(B)), "", "Внутренний расход"]);
-suppliesLines(B).forEach(r=>S.push([r.name, fm(r.qty)+" шт/гость × "+fm(r.cost,2)+" ₽/шт", r2(r.qty*r.cost), "", "Внутренний расход — детализация"]));
-if(marmiteCost(B)>0) S.push(["Аренда мармитов", "На всё мероприятие: "+fm(marmiteCost(B),2)+" ₽", c.G>0 ? r2(marmiteCost(B)/c.G) : "", "", "Внутренний расход"]);
+if (B.suppliesOn) S.push(["Расходники / посуда", "Только для нас", r2(suppliesCost(B)), "", "Расход"]);
+suppliesLines(B).forEach(r=>S.push([r.name, fm(r.qty)+" шт/гость × "+fm(r.cost,2)+" ₽/шт", r2(r.qty*r.cost), "", "Детализация"]));
+if(marmiteCost(B)>0) S.push(["Аренда мармитов", "На всё мероприятие: "+fm(marmiteCost(B),2)+" ₽", c.G>0 ? r2(marmiteCost(B)/c.G) : "", "", "Расход"]);
 if(c.beer.qty > 0) S.push([BEER.name+" — себестоимость",fm(c.beer.qty)+" порц. × "+fm(BEER.costPerLitre*BEER.portionMl/1000)+" ₽",r2(c.beer.cost)], [BEER.name+" — выручка", "",r2(c.beer.revenue)], [BEER.name+" — остаток после себестоимости", "",r2(c.beer.revenue-c.beer.cost)]);
 S.push([]);
 [["Себестоимость пакета на гостя, ₽", r2(c.st.cost)], ["Фудкост пакета", pc1(c.F)], ["Разница себестоимости на гостя, ₽", r2(c.D)],
@@ -352,7 +353,7 @@ $("fXls").onclick = () => loadXLSX(() => { const c = furCalc(), wb = XLSX.utils.
 XLSX.utils.book_append_sheet(wb, xSheet(furGuestRows(c), [48, 12, 6, 12, 6]), "Фуршет");
 XLSX.writeFile(wb, `Фуршет_${fileSafe(FS.client || "смета")}_${FS.date || today()}.xlsx`); toast("Смета фуршета сохранена в Excel"); });
 $("fXlsInt").onclick = () => loadXLSX(() => { const c = furCalc(), wb = XLSX.utils.book_new();
-XLSX.utils.book_append_sheet(wb, xSheet(furGuestRows(c), [48, 12, 6, 12, 6]), "Смета");
+XLSX.utils.book_append_sheet(wb, window.rzGuestSheet && XLSX.style_version ? rzGuestSheet("fur") : xSheet(furGuestRows(c), [48, 12, 6, 12, 6]), "Смета");
 const S = [["Позиция", "Позиция в Айко", "На гостя", "Ед.", "Себестоимость за ед., ₽", "Себестоимость на гостя, ₽"]];
 FS.rows.forEach(r => { const d = dishById(r.dish); S.push([r.title, d ? d.name : "", num(r.qty), fUnit(d), d && fin(d.cost) ? d.cost : "нет цены", r2(fRowCost(r))]); });
 if (FS.suppliesOn) S.push(["Расходники / посуда", "Только для нас", 1, "на гостя", r2(suppliesCost(FS)), r2(suppliesCost(FS))]);
