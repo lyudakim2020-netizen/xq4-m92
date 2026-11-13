@@ -53,6 +53,10 @@ function lineCost(dishId, g, pcs) {
 const d = dishById(dishId); if (!d || !fin(d.cost)) return NaN;
 return d.unit === "шт" ? (fin(pcs) ? pcs : 0) * d.cost : (fin(g) ? g : 0) / 1000 * d.cost;
 }
+function suppliesCost(state) {
+const v = num(state && state.suppliesCost);
+return state && state.suppliesOn && fin(v) && v >= 0 ? v : 0;
+}
 function pkgStats(p) {
 let c = 0, miss = [], star = [], chk = [];
 p.lines.forEach(l => { const v = lineCost(l.dish, l.g, l.pcs); const d = dishById(l.dish);
@@ -119,9 +123,10 @@ DB.services.forEach(s => { const q = num(B.svc[s.id]); if (q > 0) svcs += q * s.
 B.custom.forEach(c => { const q = num(c.qty), pr = num(c.price); if (fin(q) && fin(pr)) svcs += q * pr; });
 const total = (fin(menuD) ? menuD : 0) + svc + svcs;
 const pre = total * (num(DB.settings.prepay) || 0) / 100;
-const foodCost = G > 0 ? curCost * G : NaN;
+const internalCostPerGuest = suppliesCost(B);
+const foodCost = G > 0 ? (curCost + internalCostPerGuest) * G : NaN;
 return { p, P, G, st, F, rs, dS, dO, D, min, nrm, cap, rec, why, man, use, perGuest, menu, disc, menuD, svc, svcPct, svcs, total, pre,
-foodCost, fcB: fin(menuD) && menuD > 0 ? foodCost / menuD : NaN, gp: fin(menuD) ? menuD - foodCost : NaN, unknown };
+foodCost, internalCostPerGuest, fcB: fin(menuD) && menuD > 0 ? foodCost / menuD : NaN, gp: fin(menuD) ? menuD - foodCost : NaN, unknown };
 }
 /* ---------- даты ---------- */
 const parseD = s => { if (!s) return null; const [y, m, d] = s.split("-").map(Number); return new Date(y, m - 1, d); };

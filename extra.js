@@ -80,6 +80,7 @@ XLSX.utils.book_append_sheet(wb, xSheet(banqGuestRows(c), [16, 46, 12, 6, 16, 6]
 const S = [["Блюдо", "Блюдо в Айко", "Себестоимость на гостя, ₽", "Разница к пакету, ₽", "Изменение"]];
 B.rows.forEach((r, i) => { const s = c.rs[i], d = dishById(r.dish);
 S.push([r.title, d ? d.name : "", r.removed ? 0 : r2(s.cur), s.changed && !s.unknown ? r2(s.delta) : "", r.removed ? "убрано" : s.added ? "сверх пакета" : s.swapped ? "замена" : s.qtyChanged ? "граммовка" : ""]); });
+if (B.suppliesOn) S.push(["Расходники / посуда", "Только для нас", r2(suppliesCost(B)), "", "Внутренний расход"]);
 S.push([]);
 [["Себестоимость пакета на гостя, ₽", r2(c.st.cost)], ["Фудкост пакета", pc1(c.F)], ["Разница себестоимости на гостя, ₽", r2(c.D)],
 ["Минимум доплаты, ₽", r2(c.min)], ["Норма доплаты, ₽", r2(c.nrm)], ["Потолок доплаты, ₽", fin(c.cap) ? r2(c.cap) : "нет"], ["Рекомендуемая доплата, ₽", r2(c.rec)], ["Взяли доплату, ₽", r2(c.use)],
@@ -210,7 +211,7 @@ function furCalc() {
 const G = num(FS.guests), S = DB.settings;
 const T = (num(S.furTarget) || 16) / 100, FL = (num(S.furFloor) || 17) / 100, M = num(S.furMin) > 0 ? num(S.furMin) : 0;
 const R = Math.max(1, num(S.roundTo) || 50), up = v => Math.ceil(v / R - 1e-9) * R;
-let C = 0; const miss = [];
+let C = suppliesCost(FS); const miss = [];
 [...$("fBody").querySelectorAll("tr[data-f]")].forEach(tr => {
 const r = FS.rows[+tr.dataset.f], d = dishById(r.dish), c = fRowCost(r), q = num(r.qty);
 if (fin(c)) C += c; else miss.push(r.title || "без названия");
@@ -309,6 +310,7 @@ $("fXlsInt").onclick = () => loadXLSX(() => { const c = furCalc(), wb = XLSX.uti
 XLSX.utils.book_append_sheet(wb, xSheet(furGuestRows(c), [48, 12, 6, 12, 6]), "Смета");
 const S = [["Позиция", "Позиция в Айко", "На гостя", "Ед.", "Себестоимость за ед., ₽", "Себестоимость на гостя, ₽"]];
 FS.rows.forEach(r => { const d = dishById(r.dish); S.push([r.title, d ? d.name : "", num(r.qty), fUnit(d), d && fin(d.cost) ? d.cost : "нет цены", r2(fRowCost(r))]); });
+if (FS.suppliesOn) S.push(["Расходники / посуда", "Только для нас", 1, "на гостя", r2(suppliesCost(FS)), r2(suppliesCost(FS))]);
 S.push([], ["Себестоимость набора на гостя, ₽", "", "", "", "", r2(c.C)], ["Цена на гостя, ₽", "", "", "", "", r2(c.price)], ["Фудкост", "", "", "", "", c.price > 0 ? pc1(c.C / c.price) : ""],
 ["Целевая цена (фудкост " + fm(c.T * 100) + "%), ₽", "", "", "", "", r2(c.rec)], ["Нижняя граница (фудкост " + fm(c.FL * 100) + "%), ₽", "", "", "", "", r2(c.floorP)],
 ["Себестоимость на фуршет, ₽", "", "", "", "", c.G > 0 ? r2(c.C * c.G) : ""], ["Валовая прибыль по еде, ₽", "", "", "", "", fin(c.menu) && c.G > 0 ? r2(c.menu - c.C * c.G) : ""]);
@@ -319,6 +321,40 @@ $("fCopy").onclick = () => { const t = furText();
 const fb = () => { const ta = document.createElement("textarea"); ta.value = t; document.body.appendChild(ta); ta.select(); try { document.execCommand("copy"); toast("Смета скопирована"); } catch (e) { toast("Не удалось скопировать"); } ta.remove(); };
 if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(t).then(() => toast("Смета скопирована"), fb); else fb(); };
 $("fPrint").onclick = () => { $("printArea").innerHTML = `<pre style="font-family:inherit;font-size:12pt;white-space:pre-wrap">${esc(furText())}</pre>`; window.print(); };
+
+/* Внутренний расход хранится отдельно от блюд и услуг для гостя. */
+(function () {
+  function panel(prefix) {
+    return `<div class="panel int" id="${prefix}SuppliesPanel"><h2>Внутренние расходы</h2>
+<button type="button" class="ghost" id="${prefix}SuppliesAdd">+ Расходники / посуда</button>
+<div id="${prefix}SuppliesRow" hidden>
+<label class="f" for="${prefix}SuppliesCost">Расходники / посуда, ₽ на гостя<input id="${prefix}SuppliesCost" class="num" type="number" min="0" step="0.01" inputmode="decimal" placeholder="Введите себестоимость"></label>
+<div class="kv"><span>На всё мероприятие</span><span id="${prefix}SuppliesTotal"></span></div>
+<p class="small muted">Только для нас. Учитывается в себестоимости и фудкосте.</p>
+<button type="button" class="ghost" id="${prefix}SuppliesRemove">Убрать расход</button></div></div>`;
+  }
+  $("tab-banq").querySelector(".col").insertAdjacentHTML("beforeend", panel("b"));
+  $("tab-fur").querySelector(".col").insertAdjacentHTML("beforeend", panel("f"));
+  function render(prefix, state, guests) {
+    $(prefix + "SuppliesAdd").hidden = !!state.suppliesOn;
+    $(prefix + "SuppliesRow").hidden = !state.suppliesOn;
+    const input = $(prefix + "SuppliesCost");
+    if (document.activeElement !== input) input.value = fin(num(state.suppliesCost)) ? state.suppliesCost : "";
+    $(prefix + "SuppliesTotal").textContent = guests > 0 ? rub(suppliesCost(state) * guests, 2) : "—";
+  }
+  const prevRecalc = recalc;
+  recalc = function () { const c = prevRecalc(); render("b", B, c.G); return c; };
+  const prevFurCalc = furCalc;
+  furCalc = function () { const c = prevFurCalc(); render("f", FS, c.G); return c; };
+  ["b", "f"].forEach(prefix => {
+    const state = () => prefix === "b" ? B : FS;
+    const update = () => prefix === "b" ? recalc() : furCalc();
+    $(prefix + "SuppliesAdd").onclick = () => { state().suppliesOn = true; update(); $(prefix + "SuppliesCost").focus(); };
+    $(prefix + "SuppliesRemove").onclick = () => { state().suppliesOn = false; update(); };
+    $(prefix + "SuppliesCost").oninput = e => { state().suppliesCost = e.target.value; update(); };
+  });
+  render("b", B, num(B.guests)); render("f", FS, num(FS.guests));
+})();
 
 // вкладка «Фуршет» в общей навигации
 const _showTab = showTab;
