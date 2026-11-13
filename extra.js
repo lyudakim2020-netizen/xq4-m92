@@ -69,6 +69,7 @@ if (c.use > 0) A.push(["", "в т.ч. доплата за изменения м�
 A.push(["", "Меню всего, ₽", r2(c.menu)]);
 if (c.disc > 0) A.push(["", "Скидка " + fm(c.disc * 100) + "%, ₽", -r2(c.menu * c.disc)]);
 if (B.svcOn) A.push(["", "Обслуживание " + fm(c.svcPct * 100) + "%, ₽", r2(c.svc)]);
+if (c.beer.qty > 0) A.push(["", beerGuestLine(c.beer), r2(c.beer.revenue)]);
 DB.services.forEach(s => { const q = num(B.svc[s.id]); if (q > 0) A.push(["", s.name + " (" + fm(q) + " × " + fm(s.price) + "), ₽", r2(q * s.price)]); });
 B.custom.forEach(x => { const v = num(x.price) * num(x.qty); if (fin(v) && x.name) A.push(["", x.name + ", ₽", r2(v)]); });
 A.push(["", "ИТОГО, ₽", r2(c.total)]);
@@ -91,10 +92,11 @@ B.rows.forEach((r, i) => { const s = c.rs[i], d = dishById(r.dish);
 S.push([r.title, d ? d.name : "", r.removed ? 0 : r2(s.cur), s.changed && !s.unknown ? r2(s.delta) : "", r.removed ? "убрано" : s.added ? "сверх пакета" : s.swapped ? "замена" : s.qtyChanged ? "граммовка" : ""]); });
 if (B.suppliesOn) S.push(["Расходники / посуда", "Только для нас", r2(suppliesCost(B)), "", "Внутренний расход"]);
 suppliesLines(B).forEach(r=>S.push([r.name, fm(r.qty)+" шт/гость × "+fm(r.cost,2)+" ₽/шт", r2(r.qty*r.cost), "", "Внутренний расход — детализация"]));
+if(c.beer.qty > 0) S.push([BEER.name+" — себестоимость",fm(c.beer.qty)+" порц. × "+fm(BEER.costPerLitre*BEER.portionMl/1000)+" ₽",r2(c.beer.cost)], [BEER.name+" — выручка", "",r2(c.beer.revenue)], [BEER.name+" — остаток после себестоимости", "",r2(c.beer.revenue-c.beer.cost)]);
 S.push([]);
 [["Себестоимость пакета на гостя, ₽", r2(c.st.cost)], ["Фудкост пакета", pc1(c.F)], ["Разница себестоимости на гостя, ₽", r2(c.D)],
 ["Минимум доплаты, ₽", r2(c.min)], ["Норма доплаты, ₽", r2(c.nrm)], ["Потолок доплаты, ₽", fin(c.cap) ? r2(c.cap) : "нет"], ["Рекомендуемая доплата, ₽", r2(c.rec)], ["Взяли доплату, ₽", r2(c.use)],
-["Еда и напитки на банкет, ₽", r2(c.foodOnlyCost)], ["Расходники / посуда на банкет, ₽", r2(c.suppliesTotal)], ["Всего прямые затраты, ₽", r2(c.foodCost)], ["Прямые затраты на гостя, ₽", c.G > 0 ? r2(c.foodCost/c.G) : ""], ["Фудкост еды и напитков", pc1(c.fcFood)], ["Доля затрат с посудой в цене меню", pc1(c.fcB)], ["Остаток от меню после прямых затрат, ₽", r2(c.gp)]].forEach(x => S.push(x));
+["Еда и напитки на банкет, ₽", r2(c.foodOnlyCost)], ["Расходники / посуда на банкет, ₽", r2(c.suppliesTotal)], ["Всего прямые затраты, ₽", r2(c.foodCost)], ["Прямые затраты на гостя, ₽", c.G > 0 ? r2(c.foodCost/c.G) : ""], ["Фудкост еды и напитков", pc1(c.fcFood)], ["Доля прямых затрат в выручке меню и пива", pc1(c.fcB)], ["Остаток от меню и пива после прямых затрат, ₽", r2(c.gp)]].forEach(x => S.push(x));
 if (c.st.miss.length) S.push(["Нет себестоимости: " + c.st.miss.join(", ")]);
 XLSX.utils.book_append_sheet(wb, xSheet(S, [44, 44, 22, 18, 14]), "Себестоимость");
 XLSX.writeFile(wb, `Расчёт_для_нас_${fileSafe(B.client || "банкет")}_${B.date || today()}.xlsx`);
@@ -155,9 +157,12 @@ $("tab-saved").insertAdjacentHTML("afterend", `<section id="tab-fur" class="layo
 <div class="kv sm"><span>Еда и напитки на мероприятие</span><span id="fFoodTotal"></span></div>
 <div class="kv sm"><span>Посуда на мероприятие</span><span id="fSuppliesEvent"></span></div>
 <div class="kv"><span>Всего прямые затраты на мероприятие</span><span id="fDirectTotal"></span></div>
+<div class="kv sm"><span>Пиво — себестоимость</span><span id="fBeerCost"></span></div>
+<div class="kv sm"><span>Пиво — выручка</span><span id="fBeerRevenue"></span></div>
+<div class="kv sm"><span>Пиво — остаток после себестоимости</span><span id="fBeerRemainder"></span></div>
 <div class="kv sm"><span>Фудкост еды и напитков</span><span id="fFoodFc"></span></div>
-<div class="kv sm"><span>Доля затрат с посудой в цене меню</span><span id="fDirectFc"></span></div>
-<div class="kv"><span>Остаток от меню после прямых затрат</span><span id="fRemainder"></span></div>
+<div class="kv sm"><span>Доля прямых затрат в выручке меню и пива</span><span id="fDirectFc"></span></div>
+<div class="kv"><span>Остаток от меню и пива после прямых затрат</span><span id="fRemainder"></span></div>
 <div class="kv"><span id="fFloorL">Нижняя граница</span><span id="fFloor"></span></div>
 <div class="kv"><span>Минимальный чек</span><span id="fMinV"></span></div>
 </div>
@@ -180,6 +185,7 @@ $("tab-saved").insertAdjacentHTML("afterend", `<section id="tab-fur" class="layo
 <div class="kv"><span id="fLMenu">Фуршет</span><span id="fMenu"></span></div>
 <label class="switch" for="fSvcOn"><input type="checkbox" id="fSvcOn"> <span id="fLSvcOn">Обслуживание</span></label>
 <div class="kv" id="fRowSvc"><span id="fLSvc">Обслуживание</span><span id="fSvc"></span></div>
+<div class="kv" id="fRowBeer" hidden><span id="fLBeer"></span><span id="fBeer"></span></div>
 <div class="kv em"><span>Итого</span><span id="fTotal"></span></div>
 <div class="kv"><span id="fLPre">Предоплата</span><span id="fPre"></span></div>
 <div class="kv"><span id="fLRest">Остаток</span><span id="fRest"></span></div>
@@ -227,6 +233,7 @@ $("fPackage").addEventListener("change", function () {
 });
 function furCalc() {
 const G = num(FS.guests), S = DB.settings;
+const beer = beerCalc(FS);
 const T = (num(S.furTarget) || 16) / 100, FL = (num(S.furFloor) || 17) / 100, M = num(S.furMin) > 0 ? num(S.furMin) : 0;
 const R = Math.max(1, num(S.roundTo) || 50), up = v => Math.ceil(v / R - 1e-9) * R;
 let C = suppliesCost(FS); const miss = [];
@@ -249,16 +256,19 @@ $("fFoodC").textContent = rub(foodPer,2);
 $("fSuppliesC").textContent = rub(suppliesPer,2);
 $("fFoodTotal").textContent = G > 0 ? rub(foodPer*G,2) : "—";
 $("fSuppliesEvent").textContent = G > 0 ? rub(suppliesPer*G,2) : "—";
-$("fDirectTotal").textContent = G > 0 ? rub(C*G,2) : "—";
+$("fDirectTotal").textContent = G > 0 ? rub(C*G+beer.cost,2) : "—";
+$("fBeerCost").textContent = rub(beer.cost,2);
+$("fBeerRevenue").textContent = rub(beer.revenue,2);
+$("fBeerRemainder").textContent = rub(beer.revenue-beer.cost,2);
 const target = C > 0 ? up(C / T) : NaN, floorP = C > 0 ? up(C / FL) : NaN, rec = fin(target) ? Math.max(target, M) : NaN;
 const own = num(FS.price), price = fin(own) ? own : rec;
 $("fFoodFc").textContent = price > 0 ? pct(foodPer/price) : "—";
-$("fDirectFc").textContent = price > 0 ? pct(C/price) : "—";
-$("fRemainder").textContent = G > 0 && fin(price) ? rub((price-C)*G,2) : "—";
+$("fDirectFc").textContent = price > 0 && G > 0 ? pct((C*G+beer.cost)/(price*G+beer.revenue)) : "—";
+$("fRemainder").textContent = G > 0 && fin(price) ? rub((price-C)*G+beer.revenue-beer.cost,2) : "—";
 $("fPrice").placeholder = fin(rec) ? fm(rec) : "";
 $("fTarget").textContent = rub(rec);
 $("fTargetTot").textContent = fin(rec) && G > 0 ? `× ${fm(G)} гостей = ${rub(rec * G)}` : "";
-$("fC").textContent = rub(C, 2);
+$("fC").textContent = rub(C+(G>0 ? beer.cost/G : 0), 2);
 $("fFloorL").textContent = `Нижняя граница (фудкост ${fm(FL * 100)}%)`; $("fFloor").textContent = rub(floorP);
 $("fMinV").textContent = M > 0 ? rub(M) : "не задан";
 const bud = num(FS.budget);
@@ -279,7 +289,10 @@ if (M > 0 && own < M) { msgs.push(`Цена ниже минимального ч
 n.hidden = !msgs.length; n.className = "note " + cls; n.textContent = msgs.join(" ");
 const menu = fin(price) && G > 0 ? price * G : NaN;
 const svcPct = (num(S.service) || 0) / 100, svc = FS.svcOn && fin(menu) ? menu * svcPct : 0;
-const total = fin(menu) ? menu + svc : NaN, pre = fin(total) ? total * (num(S.prepay) || 0) / 100 : NaN;
+const total = fin(menu) ? menu + svc + beer.revenue : NaN, pre = fin(total) ? total * (num(S.prepay) || 0) / 100 : NaN;
+$("fRowBeer").hidden = !(beer.qty>0);
+$("fLBeer").textContent = `${BEER.name}, ${BEER.portionMl} мл × ${fm(beer.qty)} порц.`;
+$("fBeer").textContent = rub(beer.revenue);
 $("fLMenu").textContent = fin(price) && G > 0 ? `Фуршет: ${fm(price)} ₽ × ${fm(G)} гостей` : "Фуршет";
 $("fMenu").textContent = rub(menu);
 $("fLSvcOn").textContent = `Обслуживание ${fm(svcPct * 100)}%`; $("fLSvc").textContent = `Обслуживание ${fm(svcPct * 100)}%`;
@@ -290,7 +303,7 @@ const dt = parseD(FS.date);
 $("fLRest").textContent = dt ? `Остаток до ${fmtD(minusDays(dt, num(S.payDays) || 0))}` : "Остаток";
 $("fRest").textContent = fin(total) ? rub(total - pre) : "—";
 fsave(); save();
-return { C, T, FL, M, target, floorP, rec, price, G, menu, svc, svcPct, total, pre, dt, miss };
+return { C, T, FL, M, target, floorP, rec, price, G, menu, svc, svcPct, total, pre, dt, miss, beer, directCost:G>0 ? C*G+beer.cost : NaN, directRevenue:fin(menu) ? menu+beer.revenue : NaN };
 }
 ["fClient", "fDate"].forEach(id => $(id).addEventListener("input", e => { FS[id === "fClient" ? "client" : "date"] = e.target.value; furCalc(); }));
 $("fGuests").addEventListener("input", e => { FS.guests = num(e.target.value); furCalc(); });
@@ -318,6 +331,7 @@ FS.rows.forEach(r => { const d = dishById(r.dish), q = num(r.qty), pcs = d && d.
 A.push([r.title, fin(q) ? q : "", pcs ? "шт" : liq ? "мл" : "г", c.G > 0 && fin(q) ? r2(pcs ? q * c.G : q * c.G / 1000) : "", pcs ? "шт" : liq ? "л" : "кг"]); });
 A.push([], ["Цена на гостя, ₽", r2(c.price)], ["Фуршет всего, ₽", r2(c.menu)]);
 if (FS.svcOn) A.push(["Обслуживание " + fm(c.svcPct * 100) + "%, ₽", r2(c.svc)]);
+if(c.beer.qty>0) A.push([beerGuestLine(c.beer),r2(c.beer.revenue)]);
 A.push(["ИТОГО, ₽", r2(c.total)], ["Предоплата " + fm(num(DB.settings.prepay)) + "%, ₽", r2(c.pre)], ["Остаток, ₽", r2(c.total - c.pre)]);
 if (c.dt) A.push(["Оплатить остаток до", fmtD(minusDays(c.dt, num(DB.settings.payDays) || 0))]);
 return A;
@@ -327,6 +341,7 @@ const c = furCalc(), L = [`Фуршет${FS.client ? " — " + FS.client : ""}${
 FS.rows.forEach(r => { const d = dishById(r.dish); L.push(`• ${r.title} — ${fm(num(r.qty))} ${fUnit(d)}`); });
 L.push("", `Цена на гостя: ${rub(c.price)}`, `Фуршет: ${rub(c.menu)}`);
 if (FS.svcOn) L.push(`Обслуживание ${fm(c.svcPct * 100)}%: ${rub(c.svc)}`);
+if(c.beer.qty>0) L.push(beerGuestLine(c.beer));
 L.push(`ИТОГО: ${rub(c.total)}`, `Предоплата ${fm(num(DB.settings.prepay))}%: ${rub(c.pre)}`, `Остаток ${rub(c.total - c.pre)}${c.dt ? " — до " + fmtD(minusDays(c.dt, num(DB.settings.payDays) || 0)) : ""}`);
 return L.join("\n");
 }
@@ -339,9 +354,10 @@ const S = [["Позиция", "Позиция в Айко", "На гостя", "
 FS.rows.forEach(r => { const d = dishById(r.dish); S.push([r.title, d ? d.name : "", num(r.qty), fUnit(d), d && fin(d.cost) ? d.cost : "нет цены", r2(fRowCost(r))]); });
 if (FS.suppliesOn) S.push(["Расходники / посуда", "Только для нас", 1, "на гостя", r2(suppliesCost(FS)), r2(suppliesCost(FS))]);
 suppliesLines(FS).forEach(r=>S.push([r.name,"Только для нас",r.qty,"шт",r2(r.cost),r2(r.qty*r.cost)]));
+if(c.beer.qty>0) S.push([BEER.name+" — себестоимость","Только для нас",c.beer.qty,"порц.",BEER.costPerLitre*BEER.portionMl/1000,r2(c.beer.cost)], [BEER.name+" — выручка","", "", "", "",r2(c.beer.revenue)], [BEER.name+" — остаток после себестоимости","", "", "", "",r2(c.beer.revenue-c.beer.cost)]);
 S.push([], ["Себестоимость набора на гостя, ₽", "", "", "", "", r2(c.C)], ["Цена на гостя, ₽", "", "", "", "", r2(c.price)], ["Фудкост", "", "", "", "", c.price > 0 ? pc1(c.C / c.price) : ""],
 ["Целевая цена (фудкост " + fm(c.T * 100) + "%), ₽", "", "", "", "", r2(c.rec)], ["Нижняя граница (фудкост " + fm(c.FL * 100) + "%), ₽", "", "", "", "", r2(c.floorP)],
-["Еда и напитки на мероприятие, ₽", "", "", "", "", c.G > 0 ? r2((c.C-suppliesCost(FS))*c.G) : ""], ["Расходники / посуда на мероприятие, ₽", "", "", "", "", c.G > 0 ? r2(suppliesCost(FS)*c.G) : ""], ["Всего прямые затраты на мероприятие, ₽", "", "", "", "", c.G > 0 ? r2(c.C*c.G) : ""], ["Фудкост еды и напитков", "", "", "", "", c.price > 0 ? pc1((c.C-suppliesCost(FS))/c.price) : ""], ["Остаток от меню после прямых затрат, ₽", "", "", "", "", fin(c.menu) && c.G > 0 ? r2(c.menu-c.C*c.G) : ""]);
+["Еда и напитки на мероприятие, ₽", "", "", "", "", c.G > 0 ? r2((c.C-suppliesCost(FS))*c.G) : ""], ["Расходники / посуда на мероприятие, ₽", "", "", "", "", c.G > 0 ? r2(suppliesCost(FS)*c.G) : ""], ["Всего прямые затраты на мероприятие, ₽", "", "", "", "", c.G > 0 ? r2(c.directCost) : ""], ["Фудкост еды и напитков", "", "", "", "", c.price > 0 ? pc1((c.C-suppliesCost(FS))/c.price) : ""], ["Остаток от меню и пива после прямых затрат, ₽", "", "", "", "", fin(c.directRevenue) && c.G > 0 ? r2(c.directRevenue-c.directCost) : ""]);
 if (c.miss.length) S.push(["Нет себестоимости: " + c.miss.join(", ")]);
 XLSX.utils.book_append_sheet(wb, xSheet(S, [44, 44, 10, 6, 20, 22]), "Себестоимость");
 XLSX.writeFile(wb, `Фуршет_расчёт_для_нас_${fileSafe(FS.client || "")}_${FS.date || today()}.xlsx`); toast("Расчёт для нас сохранён в Excel"); });
@@ -349,6 +365,27 @@ $("fCopy").onclick = () => { const t = furText();
 const fb = () => { const ta = document.createElement("textarea"); ta.value = t; document.body.appendChild(ta); ta.select(); try { document.execCommand("copy"); toast("Смета скопирована"); } catch (e) { toast("Не удалось скопировать"); } ta.remove(); };
 if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(t).then(() => toast("Смета скопирована"), fb); else fb(); };
 $("fPrint").onclick = () => { $("printArea").innerHTML = `<pre style="font-family:inherit;font-size:12pt;white-space:pre-wrap">${esc(furText())}</pre>`; window.print(); };
+
+/* Пиво продаётся отдельно от пакета и показывается в гостевой смете. */
+(function () {
+  function panel(p) {return `<div class="panel" id="${p}BeerPanel"><h2>Пиво отдельно</h2>
+<p><b>${esc(BEER.name)}</b> · ${BEER.portionMl} мл · ${fm(BEER.price)} ₽ за порцию</p>
+<label class="f" for="${p}BeerQty">Количество порций на всё мероприятие<input id="${p}BeerQty" class="num" type="number" min="0" step="1" inputmode="numeric" placeholder="0"></label>
+<div class="row"><button type="button" class="ghost" id="${p}BeerEach">По одной порции на гостя</button><button type="button" class="ghost" id="${p}BeerRemove">Убрать пиво</button></div>
+<div class="kv"><span>Всего литров</span><span id="${p}BeerLitres"></span></div>
+<div class="kv"><span>Пиво — в смету гостю</span><span id="${p}BeerSale"></span></div>
+<p class="small int">Для нас: ${fm(BEER.costPerLitre)} ₽/л, ${fm(BEER.costPerLitre*BEER.portionMl/1000)} ₽ за порцию 500 мл.</p></div>`;}
+  $("svcBody").closest(".panel").insertAdjacentHTML("beforebegin",panel("b"));
+  $("tab-fur").querySelector(".col").insertAdjacentHTML("beforeend",panel("f"));
+  function render(p,state){const c=beerCalc(state),input=$(p+"BeerQty");if(document.activeElement!==input)input.value=c.qty||"";$(p+"BeerLitres").textContent=fm(c.litres,2)+" л";$(p+"BeerSale").textContent=rub(c.revenue,2);}
+  const prevB=recalc;recalc=function(){const c=prevB();render("b",B);return c;};
+  const prevF=furCalc;furCalc=function(){const c=prevF();render("f",FS);return c;};
+  ["b","f"].forEach(p=>{const state=()=>p==="b"?B:FS,update=()=>p==="b"?recalc():furCalc();
+    $(p+"BeerQty").oninput=e=>{state().beerQty=e.target.value;update();};
+    $(p+"BeerEach").onclick=()=>{state().beerQty=Math.max(0,num(state().guests)||0);update();};
+    $(p+"BeerRemove").onclick=()=>{state().beerQty=0;update();};
+  });render("b",B);render("f",FS);
+})();
 
 /* Внутренний расход хранится отдельно от блюд и услуг для гостя. */
 (function () {

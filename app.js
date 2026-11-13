@@ -77,6 +77,14 @@ return out;
 function suppliesCost(state) {
 return suppliesLines(state).reduce((sum,r)=>sum + r.qty * r.cost,0);
 }
+const BEER = {name:"Пиво Домодедовское",portionMl:500,price:400,costPerLitre:130};
+function beerCalc(state) {
+const qty = Math.max(0,num(state && state.beerQty)||0), litres = qty * BEER.portionMl / 1000;
+return {qty,litres,revenue:qty*BEER.price,cost:litres*BEER.costPerLitre};
+}
+function beerGuestLine(beer) {
+return `${BEER.name}, ${BEER.portionMl} мл: ${fm(beer.qty)} порц. × ${fm(BEER.price)} ₽ = ${rub(beer.revenue)}`;
+}
 function pkgStats(p) {
 let c = 0, miss = [], star = [], chk = [];
 p.lines.forEach(l => { const v = lineCost(l.dish, l.g, l.pcs); const d = dishById(l.dish);
@@ -141,14 +149,16 @@ const svc = B.svcOn && fin(menuD) ? menuD * svcPct : 0;
 let svcs = 0;
 DB.services.forEach(s => { const q = num(B.svc[s.id]); if (q > 0) svcs += q * s.price; });
 B.custom.forEach(c => { const q = num(c.qty), pr = num(c.price); if (fin(q) && fin(pr)) svcs += q * pr; });
-const total = (fin(menuD) ? menuD : 0) + svc + svcs;
+const beer = beerCalc(B);
+const total = (fin(menuD) ? menuD : 0) + svc + svcs + beer.revenue;
 const pre = total * (num(DB.settings.prepay) || 0) / 100;
 const internalCostPerGuest = suppliesCost(B);
 const foodOnlyCost = G > 0 ? curCost * G : NaN;
 const suppliesTotal = G > 0 ? internalCostPerGuest * G : NaN;
-const foodCost = G > 0 ? foodOnlyCost + suppliesTotal : NaN;
+const foodCost = G > 0 ? foodOnlyCost + suppliesTotal + beer.cost : NaN;
+const directRevenue = (fin(menuD) ? menuD : 0) + beer.revenue;
 return { p, P, G, st, F, rs, dS, dO, D, min, nrm, cap, rec, why, man, use, perGuest, menu, disc, menuD, svc, svcPct, svcs, total, pre,
-foodCost, foodOnlyCost, suppliesTotal, internalCostPerGuest, fcFood: menuD > 0 ? foodOnlyCost / menuD : NaN, fcB: fin(menuD) && menuD > 0 ? foodCost / menuD : NaN, gp: fin(menuD) ? menuD - foodCost : NaN, unknown };
+foodCost, foodOnlyCost, suppliesTotal, internalCostPerGuest, beer, directRevenue, fcFood: menuD > 0 ? foodOnlyCost / menuD : NaN, fcB: directRevenue > 0 ? foodCost / directRevenue : NaN, gp: fin(menuD) ? directRevenue - foodCost : NaN, unknown };
 }
 /* ---------- даты ---------- */
 const parseD = s => { if (!s) return null; const [y, m, d] = s.split("-").map(Number); return new Date(y, m - 1, d); };
@@ -265,6 +275,12 @@ $("rowChg").hidden = !dt; if (dt) $("tChg").textContent = fmtD(minusWork(dt, num
 $("mRec").textContent = rub(fin(c.man) ? c.man : c.rec); $("mTot").textContent = rub(c.total);
 $("iCost").textContent = rub(c.foodOnlyCost,2); $("iFc").textContent = pct(c.fcFood); $("iGp").textContent = rub(c.gp,2);
 $("iSupplies").textContent = rub(c.suppliesTotal,2);
+$("iBeerCost").textContent = rub(c.beer.cost,2);
+$("iBeerRevenue").textContent = rub(c.beer.revenue,2);
+$("iBeerRemainder").textContent = rub(c.beer.revenue-c.beer.cost,2);
+$("rowBeer").hidden = !(c.beer.qty > 0);
+$("lBeer").textContent = `${BEER.name}, ${BEER.portionMl} мл × ${fm(c.beer.qty)} порц.`;
+$("tBeer").textContent = rub(c.beer.revenue);
 $("iSuppliesPer").textContent = rub(c.internalCostPerGuest,2);
 $("iDirectCost").textContent = rub(c.foodCost,2);
 $("iDirectPer").textContent = c.G > 0 ? rub(c.foodCost/c.G,2) : "—";
@@ -355,6 +371,7 @@ L.push(`Меню: ${fm(c.perGuest)} ₽ × ${fm(c.G)} = ${rub(c.menu)}`);
 if (c.use > 0) L.push(`  в т.ч. доплата за изменения меню: ${rub(c.use)} на гостя`);
 if (c.disc > 0) L.push(`Скидка ${fm(c.disc * 100)}%: −${rub(c.menu * c.disc)}`);
 if (B.svcOn) L.push(`Обслуживание ${fm(c.svcPct * 100)}%: ${rub(c.svc)}`);
+if (c.beer.qty > 0) L.push(beerGuestLine(c.beer));
 DB.services.forEach(s => { const q = num(B.svc[s.id]); if (q > 0) L.push(`${s.name}: ${fm(q)} × ${fm(s.price)} = ${rub(q * s.price)}`); });
 B.custom.forEach(x => { const v = num(x.price) * num(x.qty); if (fin(v) && x.name) L.push(`${x.name}: ${rub(v)}`); });
 L.push(`ИТОГО: ${rub(c.total)}`);

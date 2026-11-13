@@ -223,6 +223,7 @@ body.locked .wrap,body.locked .mbar{display:none!important}
 <div class="kv" id="rowDisc" hidden><span>Скидка</span><span id="tDisc"></span></div>
 <div class="kv" id="rowSvc"><span id="lSvc">Обслуживание</span><span id="tSvc"></span></div>
 <div class="kv"><span>Аренда и услуги</span><span id="tSvcs"></span></div>
+<div class="kv" id="rowBeer" hidden><span id="lBeer"></span><span id="tBeer"></span></div>
 <div class="kv em"><span>Итого</span><span id="tTotal"></span></div>
 <div class="kv"><span id="lPre">Предоплата при договоре</span><span id="tPre"></span></div>
 <div class="kv"><span id="lRest">Остаток</span><span id="tRest"></span></div>
@@ -231,14 +232,17 @@ body.locked .wrap,body.locked .mbar{display:none!important}
 </div>
 <div class="panel int">
 <h2>Для нас</h2>
-<div class="kv"><span>Еда и напитки на банкет</span><span id="iCost"></span></div>
+<div class="kv"><span>Еда и напитки пакета на банкет</span><span id="iCost"></span></div>
+<div class="kv"><span>Пиво — себестоимость</span><span id="iBeerCost"></span></div>
+<div class="kv sm"><span>Пиво — выручка</span><span id="iBeerRevenue"></span></div>
+<div class="kv sm"><span>Пиво — остаток после себестоимости</span><span id="iBeerRemainder"></span></div>
 <div class="kv"><span>Расходники / посуда на банкет</span><span id="iSupplies"></span></div>
 <div class="kv sm"><span>Посуда на гостя</span><span id="iSuppliesPer"></span></div>
 <div class="kv em"><span>Всего прямые затраты</span><span id="iDirectCost"></span></div>
 <div class="kv sm"><span>Прямые затраты на гостя</span><span id="iDirectPer"></span></div>
-<div class="kv"><span>Фудкост еды и напитков</span><span id="iFc"></span></div>
-<div class="kv"><span>Доля затрат с посудой в цене меню</span><span id="iDirectShare"></span></div>
-<div class="kv"><span>Остаток от меню после прямых затрат</span><span id="iGp"></span></div>
+<div class="kv"><span>Фудкост еды и напитков пакета</span><span id="iFc"></span></div>
+<div class="kv"><span>Доля прямых затрат в выручке меню и пива</span><span id="iDirectShare"></span></div>
+<div class="kv"><span>Остаток от меню и пива после прямых затрат</span><span id="iGp"></span></div>
 <div class="kv sm"><span>на гостя</span><span id="iGpG"></span></div>
 <div id="iWarn" class="blk" hidden></div>
 </div>
