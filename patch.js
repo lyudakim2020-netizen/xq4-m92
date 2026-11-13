@@ -1,6 +1,6 @@
 // оставляем только типовые пакеты; настройки фуршета по умолчанию
 window.RIZZW_SEED.packages = window.RIZZW_SEED.packages.filter(p => p.kind === "package");
-window.RIZZW_SEED.rev = "2026-11-13T17:00:00Z";
+window.RIZZW_SEED.rev = "2026-11-13-photo-cost-v2";
 // 22.10: цены пакетов по решению Люды: Гриль 5 300, Дорадо 6 400, Лосось 7 700 (19.10 временно были 4 800 / 5 980 / 7 200)
 (function () {
   var P = { p1: 5300, p2: 6400, p3: 7700 };
@@ -60,7 +60,8 @@ Object.assign(window.RIZZW_SEED.settings, { furTarget: 16, furFloor: 17, furMin:
 })();
 Object.assign(window.RIZZW_SEED.settings, { furTarget: 16, furFloor: 17, furMin: 0 });
 // 13.11.2026: «Фуршет ноябрь», состав и порции с фото Люды.
-// Сравниваем себестоимость на одинаковую единицу (шт. или кг) и берём большую.
+// Уточнение Люды: себестоимость только из первого числового столбца фото.
+// Брускетта с ростбифом: уточнено в чате 46,60 руб. за штуку.
 (function () {
   var S = window.RIZZW_SEED;
   var menu = [
@@ -95,7 +96,7 @@ Object.assign(window.RIZZW_SEED.settings, { furTarget: 16, furFloor: 17, furMin:
     "sec": "Закуски",
     "pcs": 2,
     "g": 0,
-    "photo": 46.06
+    "photo": 46.6
   },
   {
     "dish": "d72",
@@ -178,7 +179,8 @@ Object.assign(window.RIZZW_SEED.settings, { furTarget: 16, furFloor: 17, furMin:
       d = { id: l.dish, name: l.title, group: "Легкие закуски/фуршет", unit: l.pcs ? "шт" : "кг", cost: unitCost };
       S.dishes.push(d);
     } else {
-      d.cost = Math.max(typeof d.cost === "number" ? d.cost : 0, unitCost);
+      d.cost = unitCost;
+      delete d.star;
       if (l.pcs) delete d.unitGuess;
     }
   });
