@@ -144,9 +144,11 @@ B.custom.forEach(c => { const q = num(c.qty), pr = num(c.price); if (fin(q) && f
 const total = (fin(menuD) ? menuD : 0) + svc + svcs;
 const pre = total * (num(DB.settings.prepay) || 0) / 100;
 const internalCostPerGuest = suppliesCost(B);
-const foodCost = G > 0 ? (curCost + internalCostPerGuest) * G : NaN;
+const foodOnlyCost = G > 0 ? curCost * G : NaN;
+const suppliesTotal = G > 0 ? internalCostPerGuest * G : NaN;
+const foodCost = G > 0 ? foodOnlyCost + suppliesTotal : NaN;
 return { p, P, G, st, F, rs, dS, dO, D, min, nrm, cap, rec, why, man, use, perGuest, menu, disc, menuD, svc, svcPct, svcs, total, pre,
-foodCost, internalCostPerGuest, fcB: fin(menuD) && menuD > 0 ? foodCost / menuD : NaN, gp: fin(menuD) ? menuD - foodCost : NaN, unknown };
+foodCost, foodOnlyCost, suppliesTotal, internalCostPerGuest, fcFood: menuD > 0 ? foodOnlyCost / menuD : NaN, fcB: fin(menuD) && menuD > 0 ? foodCost / menuD : NaN, gp: fin(menuD) ? menuD - foodCost : NaN, unknown };
 }
 /* ---------- даты ---------- */
 const parseD = s => { if (!s) return null; const [y, m, d] = s.split("-").map(Number); return new Date(y, m - 1, d); };
@@ -261,14 +263,19 @@ $("lRest").textContent = dt ? `Остаток до ${fmtD(minusDays(dt, num(DB.s
 $("tRest").textContent = rub(c.total - c.pre);
 $("rowChg").hidden = !dt; if (dt) $("tChg").textContent = fmtD(minusWork(dt, num(DB.settings.changeDays) || 0));
 $("mRec").textContent = rub(fin(c.man) ? c.man : c.rec); $("mTot").textContent = rub(c.total);
-$("iCost").textContent = rub(c.foodCost); $("iFc").textContent = pct(c.fcB); $("iGp").textContent = rub(c.gp);
+$("iCost").textContent = rub(c.foodOnlyCost,2); $("iFc").textContent = pct(c.fcFood); $("iGp").textContent = rub(c.gp,2);
+$("iSupplies").textContent = rub(c.suppliesTotal,2);
+$("iSuppliesPer").textContent = rub(c.internalCostPerGuest,2);
+$("iDirectCost").textContent = rub(c.foodCost,2);
+$("iDirectPer").textContent = c.G > 0 ? rub(c.foodCost/c.G,2) : "—";
+$("iDirectShare").textContent = pct(c.fcB);
 $("iGpG").textContent = c.G > 0 ? rub(c.gp / c.G) : "—";
 const w = [];
 if (c.st.miss.length) w.push(`<p class="note bad">Нет себестоимости: ${esc(c.st.miss.join(", "))}. Фудкост пакета и доплата посчитаны без них — фудкост занижен, доплата завышена.</p>`);
 if (c.unknown.length) w.push(`<p class="note bad">Не посчитана разница по строкам: ${esc(c.unknown.join(", "))} — нет себестоимости.</p>`);
 if (c.st.star.length) w.push(`<p class="note warn">Цена со звёздочкой в Айко (может быть неточной): ${esc(c.st.star.join(", "))}.</p>`);
 const fw = (num(DB.settings.fcWarn) || 0) / 100;
-if (fw > 0 && c.fcB > fw) w.push(`<p class="note warn">Фудкост банкета ${pct(c.fcB)} выше порога ${pct(fw)}.</p>`);
+if (fw > 0 && c.fcB > fw) w.push(`<p class="note warn">Доля прямых затрат ${pct(c.fcB)} выше порога ${pct(fw)}.</p>`);
 $("iWarn").innerHTML = w.join(""); $("iWarn").hidden = !w.length;
 // кухня
 const kit = {};

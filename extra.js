@@ -94,7 +94,7 @@ suppliesLines(B).forEach(r=>S.push([r.name, fm(r.qty)+" шт/гость × "+fm(
 S.push([]);
 [["Себестоимость пакета на гостя, ₽", r2(c.st.cost)], ["Фудкост пакета", pc1(c.F)], ["Разница себестоимости на гостя, ₽", r2(c.D)],
 ["Минимум доплаты, ₽", r2(c.min)], ["Норма доплаты, ₽", r2(c.nrm)], ["Потолок доплаты, ₽", fin(c.cap) ? r2(c.cap) : "нет"], ["Рекомендуемая доплата, ₽", r2(c.rec)], ["Взяли доплату, ₽", r2(c.use)],
-["Себестоимость еды на банкет, ₽", r2(c.foodCost)], ["Фудкост банкета", pc1(c.fcB)], ["Валовая прибыль по еде, ₽", r2(c.gp)]].forEach(x => S.push(x));
+["Еда и напитки на банкет, ₽", r2(c.foodOnlyCost)], ["Расходники / посуда на банкет, ₽", r2(c.suppliesTotal)], ["Всего прямые затраты, ₽", r2(c.foodCost)], ["Прямые затраты на гостя, ₽", c.G > 0 ? r2(c.foodCost/c.G) : ""], ["Фудкост еды и напитков", pc1(c.fcFood)], ["Доля затрат с посудой в цене меню", pc1(c.fcB)], ["Остаток от меню после прямых затрат, ₽", r2(c.gp)]].forEach(x => S.push(x));
 if (c.st.miss.length) S.push(["Нет себестоимости: " + c.st.miss.join(", ")]);
 XLSX.utils.book_append_sheet(wb, xSheet(S, [44, 44, 22, 18, 14]), "Себестоимость");
 XLSX.writeFile(wb, `Расчёт_для_нас_${fileSafe(B.client || "банкет")}_${B.date || today()}.xlsx`);
@@ -149,7 +149,15 @@ $("tab-saved").insertAdjacentHTML("afterend", `<section id="tab-fur" class="layo
 <h2>Цена фуршета (для нас)</h2>
 <div class="big"><span class="lbl">Цена на гостя при целевом фудкосте</span><span class="val" id="fTarget">—</span><span class="sub" id="fTargetTot"></span></div>
 <div class="blk">
-<div class="kv sm"><span>Себестоимость на гостя</span><span id="fC"></span></div>
+<div class="kv sm"><span>Еда и напитки на гостя</span><span id="fFoodC"></span></div>
+<div class="kv sm"><span>Расходники / посуда на гостя</span><span id="fSuppliesC"></span></div>
+<div class="kv"><span>Всего прямые затраты на гостя</span><span id="fC"></span></div>
+<div class="kv sm"><span>Еда и напитки на мероприятие</span><span id="fFoodTotal"></span></div>
+<div class="kv sm"><span>Посуда на мероприятие</span><span id="fSuppliesEvent"></span></div>
+<div class="kv"><span>Всего прямые затраты на мероприятие</span><span id="fDirectTotal"></span></div>
+<div class="kv sm"><span>Фудкост еды и напитков</span><span id="fFoodFc"></span></div>
+<div class="kv sm"><span>Доля затрат с посудой в цене меню</span><span id="fDirectFc"></span></div>
+<div class="kv"><span>Остаток от меню после прямых затрат</span><span id="fRemainder"></span></div>
 <div class="kv"><span id="fFloorL">Нижняя граница</span><span id="fFloor"></span></div>
 <div class="kv"><span>Минимальный чек</span><span id="fMinV"></span></div>
 </div>
@@ -235,9 +243,18 @@ tr.querySelector('[data-o="aiko"]').textContent = d ? `Айко: ${d.name}${fin(
 tr.querySelector('[data-o="cost"]').textContent = fm(c, 2);
 tr.querySelector('[data-o="tot"]').textContent = G > 0 && fin(q) ? (d && d.unit === "шт" ? fm(q * G) + " шт" : fm(q * G / 1000, 2) + (d && d.unit === "л" ? " л" : " кг")) : "";
 });
-$("fCostTot").textContent = fm(C, 2);
+const suppliesPer = suppliesCost(FS), foodPer = C - suppliesPer;
+$("fCostTot").textContent = fm(foodPer, 2);
+$("fFoodC").textContent = rub(foodPer,2);
+$("fSuppliesC").textContent = rub(suppliesPer,2);
+$("fFoodTotal").textContent = G > 0 ? rub(foodPer*G,2) : "—";
+$("fSuppliesEvent").textContent = G > 0 ? rub(suppliesPer*G,2) : "—";
+$("fDirectTotal").textContent = G > 0 ? rub(C*G,2) : "—";
 const target = C > 0 ? up(C / T) : NaN, floorP = C > 0 ? up(C / FL) : NaN, rec = fin(target) ? Math.max(target, M) : NaN;
 const own = num(FS.price), price = fin(own) ? own : rec;
+$("fFoodFc").textContent = price > 0 ? pct(foodPer/price) : "—";
+$("fDirectFc").textContent = price > 0 ? pct(C/price) : "—";
+$("fRemainder").textContent = G > 0 && fin(price) ? rub((price-C)*G,2) : "—";
 $("fPrice").placeholder = fin(rec) ? fm(rec) : "";
 $("fTarget").textContent = rub(rec);
 $("fTargetTot").textContent = fin(rec) && G > 0 ? `× ${fm(G)} гостей = ${rub(rec * G)}` : "";
@@ -324,7 +341,7 @@ if (FS.suppliesOn) S.push(["Расходники / посуда", "Только 
 suppliesLines(FS).forEach(r=>S.push([r.name,"Только для нас",r.qty,"шт",r2(r.cost),r2(r.qty*r.cost)]));
 S.push([], ["Себестоимость набора на гостя, ₽", "", "", "", "", r2(c.C)], ["Цена на гостя, ₽", "", "", "", "", r2(c.price)], ["Фудкост", "", "", "", "", c.price > 0 ? pc1(c.C / c.price) : ""],
 ["Целевая цена (фудкост " + fm(c.T * 100) + "%), ₽", "", "", "", "", r2(c.rec)], ["Нижняя граница (фудкост " + fm(c.FL * 100) + "%), ₽", "", "", "", "", r2(c.floorP)],
-["Себестоимость на фуршет, ₽", "", "", "", "", c.G > 0 ? r2(c.C * c.G) : ""], ["Валовая прибыль по еде, ₽", "", "", "", "", fin(c.menu) && c.G > 0 ? r2(c.menu - c.C * c.G) : ""]);
+["Еда и напитки на мероприятие, ₽", "", "", "", "", c.G > 0 ? r2((c.C-suppliesCost(FS))*c.G) : ""], ["Расходники / посуда на мероприятие, ₽", "", "", "", "", c.G > 0 ? r2(suppliesCost(FS)*c.G) : ""], ["Всего прямые затраты на мероприятие, ₽", "", "", "", "", c.G > 0 ? r2(c.C*c.G) : ""], ["Фудкост еды и напитков", "", "", "", "", c.price > 0 ? pc1((c.C-suppliesCost(FS))/c.price) : ""], ["Остаток от меню после прямых затрат, ₽", "", "", "", "", fin(c.menu) && c.G > 0 ? r2(c.menu-c.C*c.G) : ""]);
 if (c.miss.length) S.push(["Нет себестоимости: " + c.miss.join(", ")]);
 XLSX.utils.book_append_sheet(wb, xSheet(S, [44, 44, 10, 6, 20, 22]), "Себестоимость");
 XLSX.writeFile(wb, `Фуршет_расчёт_для_нас_${fileSafe(FS.client || "")}_${FS.date || today()}.xlsx`); toast("Расчёт для нас сохранён в Excel"); });
