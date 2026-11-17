@@ -1,6 +1,6 @@
 // оставляем только типовые пакеты; настройки фуршета по умолчанию
 window.RIZZW_SEED.packages = window.RIZZW_SEED.packages.filter(p => p.kind === "package");
-window.RIZZW_SEED.rev = "2026-11-17-lux-v1";
+window.RIZZW_SEED.rev = "2026-11-17-lux-cost-v2";
 // 22.10: цены пакетов по решению Люды: Гриль 5 300, Дорадо 6 400, Лосось 7 700 (19.10 временно были 4 800 / 5 980 / 7 200)
 (function () {
   var P = { p1: 5300, p2: 6400, p3: 7700 };
@@ -210,8 +210,10 @@ Object.assign(window.RIZZW_SEED.settings, { furTarget: 16, furFloor: 17, furMin:
 (function () {
   var S = window.RIZZW_SEED, p = S.packages.find(function (x) { return x.id === "p6"; });
   if (!p) return;
-  S.dishes.push({id:"lux-julienne-shrimp",name:"Жюльен с креветками и грибами",group:"Банкет LUX 1650",unit:"кг"});
-  S.dishes.push({id:"lux-cherry-mors",name:"Морс вишнёвый",group:"Банкет LUX 1650",unit:"л"});
+  // Люда: жюльен 89 руб. за порцию 100 г; пунш 422 руб/л; морс 86 руб/л.
+  S.dishes.push({id:"lux-julienne-shrimp",name:"Жюльен с креветками и грибами",group:"Банкет LUX 1650",unit:"кг",cost:890});
+  S.dishes.push({id:"lux-cherry-mors",name:"Морс вишнёвый",group:"Банкет LUX 1650",unit:"л",cost:86});
+  S.dishes.find(function(d){return d.id === "d54";}).cost = 422;
   var grams = {d47:130,d64:130,d50:60,d49:60,d48:50,d52:40,d67:200};
   p.lines = p.lines.filter(function(l){return l.dish !== "d59";});
   p.lines.forEach(function(l){
@@ -227,7 +229,7 @@ Object.assign(window.RIZZW_SEED.settings, { furTarget: 16, furFloor: 17, furMin:
   p.lines.push({sec:"Напитки",title:"Кофе",dish:"fn-coffee",g:0,pcs:1});
   p.name = "Люкс";
   p.price = 10000;
-  p.note = "Каждый гость выбирает один салат (220 г), одно горячее (120 г) и один гарнир (120 г). Морс и пунш — по 400 мл каждого на гостя. Чай и кофе — по одной порции. Для базовой себестоимости выбраны самые дорогие варианты по справочнику: салат с ростбифом, утка, спаржа. Себестоимость жюльена и вишнёвого морса пока не указана.";
+  p.note = "Каждый гость выбирает один салат (220 г), одно горячее (120 г) и один гарнир (120 г). Морс и пунш — по 400 мл каждого на гостя. Чай и кофе — по одной порции. Для базовой себестоимости выбраны самые дорогие варианты по справочнику: салат с ростбифом, утка, спаржа.";
 })();
 // Добавляем новую позицию в открытый расчёт этого пакета, сохраняя остальные правки.
 // Сохранённые исторические банкеты не меняем. После ручного удаления повторно не добавляем.
