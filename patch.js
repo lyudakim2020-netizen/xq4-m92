@@ -1,6 +1,6 @@
 // оставляем только типовые пакеты; настройки фуршета по умолчанию
 window.RIZZW_SEED.packages = window.RIZZW_SEED.packages.filter(p => p.kind === "package");
-window.RIZZW_SEED.rev = "2026-11-17-lux-grams-v4";
+window.RIZZW_SEED.rev = "2026-11-17-lux-portions-v5";
 // 22.10: цены пакетов по решению Люды: Гриль 5 300, Дорадо 6 400, Лосось 7 700 (19.10 временно были 4 800 / 5 980 / 7 200)
 (function () {
   var P = { p1: 5300, p2: 6400, p3: 7700 };
@@ -215,7 +215,7 @@ Object.assign(window.RIZZW_SEED.settings, { furTarget: 16, furFloor: 17, furMin:
   S.dishes.push({id:"lux-cherry-mors",name:"Морс вишнёвый",group:"Банкет LUX 1650",unit:"л",cost:86});
   S.dishes.find(function(d){return d.id === "d54";}).cost = 422;
   // Сверка фото iiko 17.11: повышаем только подорожавшие позиции.
-  // Единицы LX ниже приведены к кг по фото iiko и граммам меню Люды.
+  // Единицы LX ниже приведены к граммам меню и порционным ценам по решению Люды.
   var luxPhoto = {d47:423.64,d48:29.21,d49:63.69,d50:1492.06,d51:269.76,
     d52:1743.47,d53:549.60,d54:421.96,d55:303.76,d56:507.18,d57:1232.80,
     d58:1439.53,d60:612.15,d61:1871.26,d62:1325.26,d63:1013.29,
@@ -223,10 +223,13 @@ Object.assign(window.RIZZW_SEED.settings, { furTarget: 16, furFloor: 17, furMin:
   S.dishes.forEach(function(d){
     if (luxPhoto[d.id] !== undefined && luxPhoto[d.id] > d.cost) d.cost = luxPhoto[d.id];
   });
-  // В меню Люды ролл — 60 г, баклажаны — 50 г; в фото iiko единица — кг.
-  // Цены справочника сохраняем по правилу «только повышения», единицу исправляем.
+  // Люда подтвердила: цены LX относятся к порции, несмотря на «кг» в iiko.
+  // Баклажаны 50 г = 30,67 руб. (не снижаем до 29,21), ролл 60 г = 63,69 руб.
+  // Нормируем цену к кг только для расчёта; меню и выгрузки остаются в граммах.
+  var luxPortionGrams = {d48:50,d49:60};
   ["d48", "d49"].forEach(function(id){
     var d = S.dishes.find(function(x){return x.id === id;});
+    d.cost = d.cost * 1000 / luxPortionGrams[id];
     d.unit = "кг";
     delete d.unitGuess;
   });
