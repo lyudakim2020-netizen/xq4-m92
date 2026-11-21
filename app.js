@@ -18,7 +18,20 @@ const today = () => new Date().toISOString().slice(0, 10);
 /* ---------- состояние ---------- */
 let DB, B, PUB = "", ART = null, readOnly = false;
 function freshDB() { const d = clone(SEED); return normDB(d); }
-function normDB(d) { d.banquets = d.banquets || []; d.settings = Object.assign({}, SEED.settings, d.settings || {}); d.rev = d.rev || SEED.rev; return d; }
+function normDB(d) {
+  d.banquets = d.banquets || [];
+  d.settings = Object.assign({}, SEED.settings, d.settings || {});
+  d.rev = d.rev || SEED.rev;
+  // Заполняем пропуски в сохранённом справочнике, сохраняя цены, введённые вручную.
+  for (const id of ["d99", "d100"]) {
+    const saved = d.dishes.find(dish => dish.id === id);
+    const published = SEED.dishes.find(dish => dish.id === id);
+    if (!saved || fin(saved.cost) || !fin(published?.cost)) continue;
+    saved.cost = published.cost;
+    if (saved.group === "Нет в выгрузке Айко") saved.group = published.group;
+  }
+  return d;
+}
 function newBanquet(pkgId) {
 const p = DB.packages.find(x => x.id === pkgId) || DB.packages[0];
 return { id: null, client: "", date: "", guests: 30, pkg: p ? p.id : null, rows: p ? rowsFromPkg(p) : [],

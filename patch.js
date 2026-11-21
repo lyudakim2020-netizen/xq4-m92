@@ -28,6 +28,15 @@ window.RIZZW_SEED.rev = "2026-11-17-lux-portions-v5";
   var c = { d94: [220, true], d95: [86.75, false], d96: [86.75, false], d97: [118, false], d98: [62.56, false] };
   window.RIZZW_SEED.dishes.forEach(function (d) { var x = c[d.id]; if (x) { d.cost = x[0]; d.star = x[1]; if (d.group === "Нет в выгрузке Айко") d.group = "Хлеб и напитки (техкарта Айко)"; } });
 })();
+// Подтверждённые цены за порцию 200 мл: чай 2 ₽, кофе 22 ₽. Справочник хранит ставки за литр.
+(function () {
+  var drinks = { d99: 10, d100: 110 };
+  window.RIZZW_SEED.dishes.forEach(function (d) {
+    if (drinks[d.id] === undefined) return;
+    d.cost = drinks[d.id];
+    d.group = "Напитки (подтверждённые цены)";
+  });
+})();
 Object.assign(window.RIZZW_SEED.settings, { furTarget: 16, furFloor: 17, furMin: 0 });
 // Люкс: пять горячих блюд на выбор (Рибай, ягнёнок, лосось, тунец, утка): каждый гость выбирает ОДНО; три гарнира: каждый гость выбирает ОДИН.
 // Гости делятся по блюдам (например 10 рибаев, 10 лососей, 10 уток). В цене пакета заложены самые дорогие варианты (Рибай и спаржа).
