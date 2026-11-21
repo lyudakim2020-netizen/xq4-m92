@@ -104,9 +104,21 @@ body.guest .int{display:none!important}
 .switch input{width:auto}
 #printArea{display:none}
 #waiterPrintArea{display:none}
-#waiterMemo .memo-fields,#waiterTables{display:grid;gap:10px;margin-top:12px}
-.memo-table{display:grid;grid-template-columns:minmax(0,1fr) minmax(75px,110px) auto;gap:8px;align-items:end}
-.memo-table .memo-table-note{grid-column:1/-1}
+#waiterMemo .memo-fields{display:grid;gap:12px;margin-top:12px}
+#waiterPlan{position:relative;container-type:inline-size;border:1px solid var(--line);border-radius:8px;overflow:hidden;
+background-color:var(--sunk);background-image:linear-gradient(to right,var(--line) 1px,transparent 1px),linear-gradient(to bottom,var(--line) 1px,transparent 1px)}
+.waiter-marker{position:absolute;display:grid;grid-template-columns:minmax(0,1fr);align-content:center;gap:1px;padding:0 3px;overflow:hidden;width:16%;color:var(--accent);background:var(--surface);
+font-size:clamp(9px,2.65cqw,13px);line-height:1.15;touch-action:none;user-select:none;cursor:grab}
+.waiter-marker span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.waiter-marker small{font-size:.87em}
+.waiter-marker[data-shape="round"]{border-radius:50%}
+.waiter-marker[data-shape="landmark"]{border-style:dashed}
+.waiter-marker[aria-pressed="true"]{border-color:var(--accent);background:var(--accent-soft);z-index:1}
+.waiter-marker:active{cursor:grabbing}
+#waiterPlanEmpty{position:absolute;inset:0;display:grid;place-items:center;text-align:center;padding:12px;pointer-events:none}
+#waiterEditor{display:grid;gap:8px;padding:10px;border:1px solid var(--line);border-radius:8px}
+.waiter-editor-fields{display:grid;grid-template-columns:minmax(0,1fr) minmax(72px,100px) minmax(0,1fr);gap:8px}
+@media(max-width:480px){.waiter-editor-fields{grid-template-columns:minmax(0,1fr) 75px}.waiter-editor-fields label:first-child{grid-column:1/-1}}
 #waiterMemo textarea{min-height:64px;font-family:inherit;resize:vertical}
 @media print{
 body{background:#fff;color:#000}
@@ -123,6 +135,7 @@ body.print-waiters:not(.guest):not(.locked) #waiterPrintArea{display:block;page:
 #waiterPrintArea td{vertical-align:top}
 #waiterPrintArea tr{break-inside:avoid}
 #waiterPrintArea p{white-space:pre-wrap;overflow-wrap:anywhere}
+#waiterPrintArea img{display:block;max-width:100%;max-height:135mm;object-fit:contain;object-position:left}
 }
 .sharebar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between}
 .mbar{display:none}
@@ -214,11 +227,22 @@ body.locked .wrap,body.locked .mbar{display:none!important}
 <details id="waiterMemo">
 <summary>Памятка для официантов</summary>
 <div class="memo-fields">
-<label class="f">Расстановка столов<textarea id="waiterLayout" rows="2" placeholder="Например, столы вдоль окон, проход к выходу оставить свободным"></textarea></label>
-<div id="waiterTables"></div>
-<div class="row"><button type="button" class="ghost" id="addWaiterTable">+ Добавить стол</button><span class="small muted" id="waiterTotal" aria-live="polite"></span></div>
+<div class="row between"><h2>Схема зала</h2><span class="small muted" id="waiterTotal" aria-live="polite"></span></div>
+<div class="row"><button type="button" class="ghost" id="addWaiterTable">+ Стол</button><button type="button" class="ghost" id="addWaiterLandmark">+ Вход, окно или зона</button></div>
+<p class="why">Перетащите стол, чтобы передвинуть его. Нажмите на стол, чтобы открыть настройки. С клавиатуры стол можно двигать стрелками.</p>
+<div id="waiterPlan" role="group" aria-label="Схема зала"></div>
+<div id="waiterEditor" hidden>
+<div class="waiter-editor-fields">
+<label class="f">Название<input id="waiterName"></label>
+<label class="f" id="waiterShapeField">Форма<select id="waiterShape"><option value="rect">Прямоугольный</option><option value="round">Овальный</option></select></label>
+<label class="f" id="waiterGuestsField">Гостей<input id="waiterGuests" type="number" min="0" step="1" inputmode="numeric"></label>
+</div>
+<label class="f">Что учесть<textarea id="waiterNote" rows="2"></textarea></label>
+<div class="row"><button type="button" id="removeWaiterTable">Убрать со схемы</button></div>
+</div>
+<label class="f">Заметки по расстановке<textarea id="waiterLayout" rows="2" placeholder="Например, оставить проход к выходу"></textarea></label>
 <label class="f">Заметки по сервировке<textarea id="waiterServing" rows="2" placeholder="Например, воду и бокалы поставить до прихода гостей"></textarea></label>
-<div class="row"><button type="button" class="pri" id="printWaiterMemo">Распечатать памятку</button></div>
+<div class="row"><button type="button" class="pri" id="downloadWaiterMemo">Скачать PDF</button><button type="button" id="printWaiterMemo">Распечатать памятку</button><button type="button" id="saveWaiterBanquet">Сохранить банкет</button></div>
 </div>
 </details>
 </div>
@@ -343,7 +367,7 @@ body.locked .wrap,body.locked .mbar{display:none!important}
 <script>window.RIZZW_PIN="c9f1b1bcf684433fe9b58d452274e074278c6e39a7b1950325ca60056075b9c2";</script>
 <script src="data.js"></script>
 <script src="patch.js"></script>
-<script src="waiters.js"></script>
+<script src="waiters.js?v=20261121-plan"></script>
 <script src="app.js?v=20261121"></script>
 <script src="extra.js"></script>
 <script src="exports.js?v=20261121"></script>
