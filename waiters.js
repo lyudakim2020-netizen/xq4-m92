@@ -34,12 +34,23 @@ function hasWaiterPosition(table) {
   return Number.isFinite(table.x) && Number.isFinite(table.y);
 }
 
+function waiterTableSize(table) {
+  const { grid, tileWidth, tileHeight } = waiterRoom;
+  const length = table.length ? table.length * grid : tileWidth;
+  const width = table.width ? table.width * grid : tileHeight;
+  return table.turned ? { w: width, h: length } : { w: length, h: width };
+}
+
 function placeWaiterTable(table, tables) {
   const { width, tileWidth, tileHeight, gap } = waiterRoom;
   const occupied = tables.filter(item => item !== table && hasWaiterPosition(item));
   for (let y = gap; ; y += tileHeight + gap * 2) {
     for (let x = gap; x + tileWidth <= width - gap; x += tileWidth + gap * 2) {
-      if (occupied.some(item => Math.abs(x - item.x) < tileWidth + gap && Math.abs(y - item.y) < tileHeight + gap)) continue;
+      if (occupied.some(item => {
+        const { w, h } = waiterTableSize(item);
+        return x < item.x + w + gap && x + tileWidth + gap > item.x &&
+          y < item.y + h + gap && y + tileHeight + gap > item.y;
+      })) continue;
       Object.assign(table, { x, y });
       return;
     }
@@ -47,14 +58,17 @@ function placeWaiterTable(table, tables) {
 }
 
 function waiterPlanHeight(tables) {
-  const { minHeight, tileHeight, gap, grid } = waiterRoom;
-  const bottom = tables.reduce((max, table) => Math.max(max, table.y + tileHeight + gap), Math.max(minHeight, waiterMemo().planHeight || 0));
+  const { minHeight, gap, grid } = waiterRoom;
+  const bottom = tables.reduce((max, table) => Math.max(max, table.y + waiterTableSize(table).h + gap), Math.max(minHeight, waiterMemo().planHeight || 0));
   return Math.ceil(bottom / grid) * grid;
 }
 
 function positionWaiterMarker(marker, table, height) {
+  const { w, h } = waiterTableSize(table);
   marker.style.left = (table.x / waiterRoom.width * 100) + "%";
   marker.style.top = (table.y / height * 100) + "%";
+  marker.style.width = (w / waiterRoom.width * 100) + "%";
+  marker.style.height = (h / height * 100) + "%";
 }
 
 function updateWaiterMarker(marker, table, index) {
@@ -64,7 +78,7 @@ function updateWaiterMarker(marker, table, index) {
   marker.querySelector("span").textContent = name;
   marker.querySelector("small").textContent = count;
   marker.setAttribute("aria-label", [name, count].filter(Boolean).join(", "));
-  marker.title = marker.getAttribute("aria-label");
+  marker.title = [marker.getAttribute("aria-label"), table.note].filter(Boolean).join("\n");
 }
 
 function renderWaiterPlan() {
@@ -92,7 +106,6 @@ function renderWaiterPlan() {
     marker.dataset.index = index;
     marker.setAttribute("aria-pressed", String(index === selectedWaiterTable));
     marker.innerHTML = "<span></span><small></small>";
-    marker.style.height = (waiterRoom.tileHeight / height * 100) + "%";
     positionWaiterMarker(marker, table, height);
     updateWaiterMarker(marker, table, index);
     plan.appendChild(marker);
@@ -111,6 +124,11 @@ function selectWaiterTable(index) {
   const landmark = table.shape === "landmark";
   $("waiterShapeField").hidden = landmark;
   $("waiterGuestsField").hidden = landmark;
+  if ($("waiterSizeFields")) {
+    $("waiterSizeFields").hidden = landmark;
+    $("waiterLength").value = table.length || waiterRoom.tileWidth / waiterRoom.grid;
+    $("waiterWidth").value = table.width || waiterRoom.tileHeight / waiterRoom.grid;
+  }
   $("waiterShape").value = table.shape === "round" ? "round" : "rect";
   $("waiterName").placeholder = waiterName({ shape: table.shape }, index);
   $("waiterName").value = table.name || "";
@@ -129,9 +147,23 @@ function renderWaiterMemo() {
 }
 
 function moveWaiterTable(table, marker, x, y, height) {
-  table.x = Math.round(Math.max(0, Math.min(waiterRoom.width - waiterRoom.tileWidth, x)));
-  table.y = Math.round(Math.max(0, Math.min(height - waiterRoom.tileHeight - waiterRoom.gap, y)));
+  const { w, h } = waiterTableSize(table);
+  table.x = Math.round(Math.max(0, Math.min(waiterRoom.width - w, x)));
+  table.y = Math.round(Math.max(0, Math.min(height - h - waiterRoom.gap, y)));
   positionWaiterMarker(marker, table, height);
+}
+
+function resizeWaiterTable(change) {
+  const tables = waiterMemo().tables;
+  const table = tables[selectedWaiterTable];
+  if (!table || table.shape === "landmark") return;
+  const before = waiterTableSize(table);
+  const height = waiterPlanHeight(tables);
+  Object.assign(table, change);
+  const after = waiterTableSize(table);
+  const marker = $("waiterPlan").querySelector('[data-index="' + selectedWaiterTable + '"]');
+  moveWaiterTable(table, marker, table.x + (before.w - after.w) / 2, table.y + (before.h - after.h) / 2, height);
+  saveNow();
 }
 
 function initWaiterDrag(plan) {
@@ -176,7 +208,7 @@ function initWaiterDrag(plan) {
 }
 
 function waiterPlanImage(tables) {
-  const { width, tileWidth, tileHeight, grid } = waiterRoom;
+  const { width, grid } = waiterRoom;
   const height = waiterPlanHeight(tables);
   const scale = Math.min(3, 6000 / height);
   const canvas = document.createElement("canvas");
@@ -196,10 +228,12 @@ function waiterPlanImage(tables) {
   ctx.textAlign = "center";
   tables.forEach((table, index) => {
     const { x, y, shape } = table;
-    const center = x + tileWidth / 2;
+    const { w, h } = waiterTableSize(table);
+    const center = x + w / 2;
+    const middle = y + h / 2;
     ctx.beginPath();
-    if (shape === "round") ctx.ellipse(center, y + tileHeight / 2, tileWidth / 2, tileHeight / 2, 0, 0, 2 * Math.PI);
-    else ctx.roundRect(x, y, tileWidth, tileHeight, 5);
+    if (shape === "round") ctx.ellipse(center, middle, w / 2, h / 2, 0, 0, 2 * Math.PI);
+    else ctx.roundRect(x, y, w, h, 5);
     ctx.fillStyle = "#ffffff";
     ctx.fill();
     ctx.strokeStyle = "#416456";
@@ -209,16 +243,16 @@ function waiterPlanImage(tables) {
     ctx.font = "600 13px Arial, sans-serif";
     const name = waiterName(table, index);
     let label = name;
-    if (ctx.measureText(label).width > tileWidth - 12) {
+    if (ctx.measureText(label).width > w - 12) {
       const characters = Array.from(name).slice(0, 24);
-      while (characters.length > 1 && ctx.measureText(characters.join("") + "…").width > tileWidth - 12) characters.pop();
+      while (characters.length > 1 && ctx.measureText(characters.join("") + "…").width > w - 12) characters.pop();
       label = characters.join("") + "…";
     }
     const hasCount = shape !== "landmark" && table.guests !== "";
-    ctx.fillText(label, center, y + (hasCount ? 20 : 28));
+    ctx.fillText(label, center, middle + (hasCount ? -4 : 4));
     if (hasCount) {
       ctx.font = "11px Arial, sans-serif";
-      ctx.fillText(fm(waiterGuestCount(table.guests)) + " чел.", center, y + 35);
+      ctx.fillText(fm(waiterGuestCount(table.guests)) + " чел.", center, middle + 11, w - 6);
     }
   });
   return canvas.toDataURL("image/png");
@@ -321,6 +355,17 @@ function initWaiterMemo() {
   };
   $("addWaiterTable").onclick = () => add("rect");
   $("addWaiterLandmark").onclick = () => add("landmark");
+  if ($("waiterSizeFields")) {
+    [["waiterLength", "length", 12], ["waiterWidth", "width", 8]].forEach(([id, field, max]) => {
+      const select = $(id);
+      for (let size = 2; size <= max; size++) select.add(new Option(size, size));
+      select.onchange = () => resizeWaiterTable({ [field]: Number(select.value) });
+    });
+    $("rotateWaiterTable").onclick = () => {
+      const table = waiterMemo().tables[selectedWaiterTable];
+      if (table) resizeWaiterTable({ turned: !table.turned });
+    };
+  }
   const fields = { waiterName: "name", waiterGuests: "guests", waiterShape: "shape", waiterNote: "note" };
   Object.entries(fields).forEach(([id, field]) => {
     $(id).addEventListener("input", event => {

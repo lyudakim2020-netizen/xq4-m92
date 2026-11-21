@@ -107,7 +107,7 @@ body.guest .int{display:none!important}
 #waiterMemo .memo-fields{display:grid;gap:12px;margin-top:12px}
 #waiterPlan{position:relative;container-type:inline-size;border:1px solid var(--line);border-radius:8px;overflow:hidden;
 background-color:var(--sunk);background-image:linear-gradient(to right,var(--line) 1px,transparent 1px),linear-gradient(to bottom,var(--line) 1px,transparent 1px)}
-.waiter-marker{position:absolute;display:grid;grid-template-columns:minmax(0,1fr);align-content:center;gap:1px;padding:0 3px;overflow:hidden;width:16%;color:var(--accent);background:var(--surface);
+.waiter-marker{position:absolute;display:grid;grid-template-columns:minmax(0,1fr);align-content:center;gap:1px;padding:0 3px;overflow:hidden;color:var(--accent);background:var(--surface);
 font-size:clamp(9px,2.65cqw,13px);line-height:1.15;touch-action:none;user-select:none;cursor:grab}
 .waiter-marker span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .waiter-marker small{font-size:.87em}
@@ -118,6 +118,7 @@ font-size:clamp(9px,2.65cqw,13px);line-height:1.15;touch-action:none;user-select
 #waiterPlanEmpty{position:absolute;inset:0;display:grid;place-items:center;text-align:center;padding:12px;pointer-events:none}
 #waiterEditor{display:grid;gap:8px;padding:10px;border:1px solid var(--line);border-radius:8px}
 .waiter-editor-fields{display:grid;grid-template-columns:minmax(0,1fr) minmax(72px,100px) minmax(0,1fr);gap:8px}
+.waiter-size-fields{display:flex;align-items:end;flex-wrap:wrap;gap:8px}
 @media(max-width:480px){.waiter-editor-fields{grid-template-columns:minmax(0,1fr) 75px}.waiter-editor-fields label:first-child{grid-column:1/-1}}
 #waiterMemo textarea{min-height:64px;font-family:inherit;resize:vertical}
 @media print{
@@ -237,7 +238,12 @@ body.locked .wrap,body.locked .mbar{display:none!important}
 <label class="f" id="waiterShapeField">Форма<select id="waiterShape"><option value="rect">Прямоугольный</option><option value="round">Овальный</option></select></label>
 <label class="f" id="waiterGuestsField">Гостей<input id="waiterGuests" type="number" min="0" step="1" inputmode="numeric"></label>
 </div>
-<label class="f">Что учесть<textarea id="waiterNote" rows="2"></textarea></label>
+<div class="waiter-size-fields" id="waiterSizeFields">
+<label class="f">Длина, клеток<select id="waiterLength"></select></label>
+<label class="f">Ширина, клеток<select id="waiterWidth"></select></label>
+<button type="button" id="rotateWaiterTable">↻ Повернуть на 90°</button>
+</div>
+<label class="f">Комментарий для официантов<textarea id="waiterNote" rows="2"></textarea></label>
 <div class="row"><button type="button" id="removeWaiterTable">Убрать со схемы</button></div>
 </div>
 <label class="f">Заметки по расстановке<textarea id="waiterLayout" rows="2" placeholder="Например, оставить проход к выходу"></textarea></label>
@@ -367,7 +373,7 @@ body.locked .wrap,body.locked .mbar{display:none!important}
 <script>window.RIZZW_PIN="c9f1b1bcf684433fe9b58d452274e074278c6e39a7b1950325ca60056075b9c2";</script>
 <script src="data.js"></script>
 <script src="patch.js"></script>
-<script src="waiters.js?v=20261121-plan"></script>
+<script src="waiters.js?v=20261121-table-size"></script>
 <script src="app.js?v=20261121"></script>
 <script src="extra.js"></script>
 <script src="exports.js?v=20261121"></script>
