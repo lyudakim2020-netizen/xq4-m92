@@ -111,8 +111,12 @@ background-color:var(--sunk);background-image:linear-gradient(to right,var(--lin
 font-size:clamp(9px,2.65cqw,13px);line-height:1.15;touch-action:none;user-select:none;cursor:grab}
 .waiter-marker span,.waiter-marker small{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .waiter-marker small{font-size:.87em}
-.waiter-marker:has(.waiter-table-note:not([hidden])){gap:0;line-height:1}
-.waiter-marker .waiter-table-note{color:var(--fg);font-weight:600}
+.waiter-marker:has(.waiter-table-note:not([hidden])){align-content:safe center;grid-auto-rows:max-content;gap:0;line-height:1;overflow:visible}
+.waiter-marker .waiter-table-note{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;justify-self:center;
+width:max(100%,42px);white-space:normal;overflow-wrap:anywhere;font-weight:600;color:var(--fg);background:inherit;border-radius:3px}
+.waiter-marker[data-note-edge="left"] .waiter-table-note{justify-self:start}
+.waiter-marker[data-note-edge="right"] .waiter-table-note{justify-self:end}
+@container (max-width:420px){.waiter-marker:has(.waiter-table-note:not([hidden])){font-size:8.5px;line-height:.98}}
 .waiter-marker[data-shape="round"]{border-radius:50%}
 .waiter-marker[data-shape="landmark"]{border-style:dashed}
 .waiter-marker[aria-pressed="true"]{border-color:var(--accent);background:var(--accent-soft);z-index:1}
@@ -375,7 +379,7 @@ body.locked .wrap,body.locked .mbar{display:none!important}
 <script>window.RIZZW_PIN="c9f1b1bcf684433fe9b58d452274e074278c6e39a7b1950325ca60056075b9c2";</script>
 <script src="data.js"></script>
 <script src="patch.js"></script>
-<script src="waiters.js?v=20261121-table-notes"></script>
+<script src="waiters.js?v=20261121-wrap-notes"></script>
 <script src="app.js?v=20261121"></script>
 <script src="extra.js"></script>
 <script src="exports.js?v=20261121"></script>

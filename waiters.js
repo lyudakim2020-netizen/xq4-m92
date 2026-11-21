@@ -69,6 +69,7 @@ function positionWaiterMarker(marker, table, height) {
   marker.style.top = (table.y / height * 100) + "%";
   marker.style.width = (w / waiterRoom.width * 100) + "%";
   marker.style.height = (h / height * 100) + "%";
+  marker.dataset.noteEdge = table.x < 40 ? "left" : table.x + w > waiterRoom.width - 40 ? "right" : "";
   if (Number(marker.dataset.index) === selectedWaiterTable) positionWaiterGrips(table, height);
 }
 
@@ -320,6 +321,14 @@ function initWaiterDrag(plan) {
   });
 }
 
+function waiterNoteLines(ctx, note, width) {
+  if (!note) return [];
+  const words = note.split(" ");
+  let first = words.shift();
+  while (words.length && ctx.measureText(first + " " + words[0]).width <= width) first += " " + words.shift();
+  return [first, words.join(" ")].filter(Boolean);
+}
+
 function waiterPlanImage(tables) {
   const { width, grid } = waiterRoom;
   const height = waiterPlanHeight(tables);
@@ -354,20 +363,25 @@ function waiterPlanImage(tables) {
     ctx.stroke();
     ctx.fillStyle = "#17221e";
     const count = shape !== "landmark" && table.guests !== "" ? fm(waiterGuestCount(table.guests)) + " чел." : "";
+    const labelWidth = shape === "round" ? w * .8 : w - 10;
+    const noteWidth = Math.max(50, labelWidth);
+    const noteFont = "600 11px Arial, sans-serif";
+    ctx.font = noteFont;
+    const notes = waiterNoteLines(ctx, waiterPreviewNote(table), noteWidth);
+    const noteCenter = Math.max(noteWidth / 2, Math.min(width - noteWidth / 2, center));
     const lines = [
-      [waiterName(table, index), "600 13px Arial, sans-serif"],
-      [count, "11px Arial, sans-serif"],
-      [waiterPreviewNote(table), "600 11px Arial, sans-serif"]
+      [waiterName(table, index), "600 13px Arial, sans-serif", labelWidth, center],
+      [count, "11px Arial, sans-serif", labelWidth, center],
+      ...notes.map(note => [note, noteFont, noteWidth, noteCenter])
     ].filter(([label]) => label);
-    const available = shape === "round" && lines.length === 3 ? w * .75 : w - 10;
-    lines.forEach(([label, font], line) => {
+    lines.forEach(([label, font, available, lineCenter], line) => {
       ctx.font = font;
       if (ctx.measureText(label).width > available) {
         const characters = Array.from(label).slice(0, Math.ceil(available / 3));
         while (characters.length > 1 && ctx.measureText(characters.join("") + "…").width > available) characters.pop();
         label = characters.join("") + "…";
       }
-      ctx.fillText(label, center, middle + 4 + (line - (lines.length - 1) / 2) * 12, available);
+      ctx.fillText(label, lineCenter, middle + 4 + (line - (lines.length - 1) / 2) * 10, available);
     });
   });
   return canvas.toDataURL("image/png");
