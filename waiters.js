@@ -86,9 +86,18 @@ function updateWaiterMarker(marker, table, index) {
   const count = table.shape === "landmark" || table.guests === "" ? "" : fm(waiterGuestCount(table.guests)) + " чел.";
   marker.dataset.shape = table.shape || "rect";
   marker.querySelector("span").textContent = name;
-  marker.querySelector("small").textContent = count;
+  const guests = marker.querySelector("small");
+  guests.textContent = count;
+  guests.hidden = !count;
+  const note = marker.querySelector(".waiter-table-note");
+  note.textContent = waiterPreviewNote(table);
+  note.hidden = !note.textContent;
   marker.setAttribute("aria-label", [name, count].filter(Boolean).join(", "));
   marker.title = [marker.getAttribute("aria-label"), table.note].filter(Boolean).join("\n");
+}
+
+function waiterPreviewNote(table) {
+  return (table.note || "").trim().replace(/\s+/g, " ");
 }
 
 function renderWaiterPlan() {
@@ -116,7 +125,7 @@ function renderWaiterPlan() {
     marker.dataset.index = index;
     marker.setAttribute("aria-haspopup", "dialog");
     marker.setAttribute("aria-pressed", String(index === selectedWaiterTable));
-    marker.innerHTML = "<span></span><small></small>";
+    marker.innerHTML = '<span></span><small></small><small class="waiter-table-note"></small>';
     positionWaiterMarker(marker, table, height);
     updateWaiterMarker(marker, table, index);
     plan.appendChild(marker);
@@ -344,20 +353,22 @@ function waiterPlanImage(tables) {
     ctx.setLineDash(shape === "landmark" ? [4, 3] : []);
     ctx.stroke();
     ctx.fillStyle = "#17221e";
-    ctx.font = "600 13px Arial, sans-serif";
-    const name = waiterName(table, index);
-    let label = name;
-    if (ctx.measureText(label).width > w - 12) {
-      const characters = Array.from(name).slice(0, 24);
-      while (characters.length > 1 && ctx.measureText(characters.join("") + "…").width > w - 12) characters.pop();
-      label = characters.join("") + "…";
-    }
-    const hasCount = shape !== "landmark" && table.guests !== "";
-    ctx.fillText(label, center, middle + (hasCount ? -4 : 4));
-    if (hasCount) {
-      ctx.font = "11px Arial, sans-serif";
-      ctx.fillText(fm(waiterGuestCount(table.guests)) + " чел.", center, middle + 11, w - 6);
-    }
+    const count = shape !== "landmark" && table.guests !== "" ? fm(waiterGuestCount(table.guests)) + " чел." : "";
+    const lines = [
+      [waiterName(table, index), "600 13px Arial, sans-serif"],
+      [count, "11px Arial, sans-serif"],
+      [waiterPreviewNote(table), "600 11px Arial, sans-serif"]
+    ].filter(([label]) => label);
+    const available = shape === "round" && lines.length === 3 ? w * .75 : w - 10;
+    lines.forEach(([label, font], line) => {
+      ctx.font = font;
+      if (ctx.measureText(label).width > available) {
+        const characters = Array.from(label).slice(0, Math.ceil(available / 3));
+        while (characters.length > 1 && ctx.measureText(characters.join("") + "…").width > available) characters.pop();
+        label = characters.join("") + "…";
+      }
+      ctx.fillText(label, center, middle + 4 + (line - (lines.length - 1) / 2) * 12, available);
+    });
   });
   return canvas.toDataURL("image/png");
 }
