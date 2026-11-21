@@ -69,6 +69,16 @@ function positionWaiterMarker(marker, table, height) {
   marker.style.top = (table.y / height * 100) + "%";
   marker.style.width = (w / waiterRoom.width * 100) + "%";
   marker.style.height = (h / height * 100) + "%";
+  if (Number(marker.dataset.index) === selectedWaiterTable) positionWaiterGrips(table, height);
+}
+
+function positionWaiterGrips(table, height) {
+  const { w, h } = waiterTableSize(table);
+  $("waiterPlan").querySelectorAll("[data-resize]").forEach(grip => {
+    const horizontal = grip.dataset.resize === "x";
+    grip.style.left = ((table.x + w * (horizontal ? 1 : .5)) / waiterRoom.width * 100) + "%";
+    grip.style.top = ((table.y + h * (horizontal ? .5 : 1)) / height * 100) + "%";
+  });
 }
 
 function updateWaiterMarker(marker, table, index) {
@@ -104,36 +114,88 @@ function renderWaiterPlan() {
     marker.type = "button";
     marker.className = "waiter-marker";
     marker.dataset.index = index;
+    marker.setAttribute("aria-haspopup", "dialog");
     marker.setAttribute("aria-pressed", String(index === selectedWaiterTable));
     marker.innerHTML = "<span></span><small></small>";
     positionWaiterMarker(marker, table, height);
     updateWaiterMarker(marker, table, index);
     plan.appendChild(marker);
   });
+  [["x", "Изменить размер стола по горизонтали"], ["y", "Изменить размер стола по вертикали"]].forEach(([axis, label]) => {
+    const grip = document.createElement("button");
+    grip.type = "button";
+    grip.className = "waiter-grip";
+    grip.dataset.resize = axis;
+    grip.setAttribute("aria-label", label);
+    grip.title = label;
+    grip.hidden = true;
+    plan.appendChild(grip);
+  });
   updateWaiterTotal();
 }
 
-function selectWaiterTable(index) {
+function waiterMarker(index = selectedWaiterTable) {
+  return $("waiterPlan").querySelector('[data-index="' + index + '"]');
+}
+
+function positionWaiterEditor() {
+  const editor = $("waiterEditor");
+  if (editor.hidden) return;
+  const marker = waiterMarker();
+  const anchor = marker?.getBoundingClientRect();
+  const viewport = window.visualViewport;
+  const left = viewport?.offsetLeft || 0;
+  const top = viewport?.offsetTop || 0;
+  const right = left + (viewport?.width || window.innerWidth);
+  const bottom = top + (viewport?.height || window.innerHeight);
+  const gap = 10;
+  if (!anchor || anchor.bottom < top || anchor.top > bottom) {
+    editor.hidden = true;
+    return;
+  }
+  editor.style.maxHeight = Math.max(0, bottom - top - gap * 2) + "px";
+  const w = editor.offsetWidth, h = editor.offsetHeight;
+  let x = anchor.right + gap, y = anchor.top;
+  if (x + w > right - gap) {
+    x = anchor.left - w - gap;
+    if (x < left + gap) {
+      x = anchor.left + (anchor.width - w) / 2;
+      y = anchor.bottom + gap;
+      if (y + h > bottom - gap && anchor.top - h - gap >= top + gap) y = anchor.top - h - gap;
+    }
+  }
+  editor.style.left = Math.max(left + gap, Math.min(right - w - gap, x)) + "px";
+  editor.style.top = Math.max(top + gap, Math.min(bottom - h - gap, y)) + "px";
+}
+
+function selectWaiterTable(index, edit = false) {
   selectedWaiterTable = index;
-  const table = waiterMemo().tables[index];
-  $("waiterEditor").hidden = !table;
+  const tables = waiterMemo().tables;
+  const table = tables[index];
+  $("waiterEditor").hidden = !table || !edit;
   $("waiterPlan").querySelectorAll("[data-index]").forEach(marker => {
     marker.setAttribute("aria-pressed", String(Number(marker.dataset.index) === index));
   });
+  $("waiterPlan").querySelectorAll("[data-resize]").forEach(grip => { grip.hidden = !table || table.shape === "landmark"; });
   if (!table) return;
+  positionWaiterGrips(table, waiterPlanHeight(tables));
+  if (!edit) return;
   const landmark = table.shape === "landmark";
   $("waiterShapeField").hidden = landmark;
   $("waiterGuestsField").hidden = landmark;
-  if ($("waiterSizeFields")) {
-    $("waiterSizeFields").hidden = landmark;
-    $("waiterLength").value = table.length || waiterRoom.tileWidth / waiterRoom.grid;
-    $("waiterWidth").value = table.width || waiterRoom.tileHeight / waiterRoom.grid;
-  }
+  $("rotateWaiterTable").hidden = landmark;
+  $("waiterEditorTitle").textContent = waiterName(table, index);
   $("waiterShape").value = table.shape === "round" ? "round" : "rect";
   $("waiterName").placeholder = waiterName({ shape: table.shape }, index);
   $("waiterName").value = table.name || "";
   $("waiterGuests").value = table.guests ?? "";
   $("waiterNote").value = table.note || "";
+  positionWaiterEditor();
+  const first = landmark ? $("waiterName") : $("waiterGuests");
+  if (!$("waiterEditor").hidden) {
+    first.focus({ preventScroll: true });
+    first.select();
+  }
 }
 
 function renderWaiterMemo() {
@@ -153,56 +215,98 @@ function moveWaiterTable(table, marker, x, y, height) {
   positionWaiterMarker(marker, table, height);
 }
 
-function resizeWaiterTable(change) {
+function rotateWaiterTable() {
   const tables = waiterMemo().tables;
   const table = tables[selectedWaiterTable];
   if (!table || table.shape === "landmark") return;
   const before = waiterTableSize(table);
   const height = waiterPlanHeight(tables);
-  Object.assign(table, change);
+  table.turned = !table.turned;
   const after = waiterTableSize(table);
-  const marker = $("waiterPlan").querySelector('[data-index="' + selectedWaiterTable + '"]');
+  const marker = waiterMarker();
   moveWaiterTable(table, marker, table.x + (before.w - after.w) / 2, table.y + (before.h - after.h) / 2, height);
   saveNow();
+  positionWaiterEditor();
+}
+
+function stretchWaiterTable(table, marker, w, h, height) {
+  const { width, grid, gap } = waiterRoom;
+  const across = Math.round(Math.max(grid * 2, Math.min(width - table.x, height - gap, w)));
+  const down = Math.round(Math.max(grid * 2, Math.min(height - gap - table.y, width, h)));
+  table.length = (table.turned ? down : across) / grid;
+  table.width = (table.turned ? across : down) / grid;
+  positionWaiterMarker(marker, table, height);
 }
 
 function initWaiterDrag(plan) {
   let drag = null;
+  let suppressClick = false;
   plan.addEventListener("pointerdown", event => {
-    const marker = event.target.closest("[data-index]");
-    if (!marker || event.button !== 0 || !event.isPrimary) return;
+    if (event.button !== 0 || !event.isPrimary) return;
+    suppressClick = false;
+    const grip = event.target.closest("[data-resize]");
+    const marker = grip ? waiterMarker() : event.target.closest("[data-index]");
+    if (!marker) return;
     const tables = waiterMemo().tables;
     const table = tables[marker.dataset.index];
-    drag = { marker, table, height: waiterPlanHeight(tables), x: table.x, y: table.y,
+    drag = { marker, table, axis: grip?.dataset.resize, size: waiterTableSize(table), height: waiterPlanHeight(tables), x: table.x, y: table.y,
       pointer: event.pointerId, startX: event.clientX, startY: event.clientY, moved: false };
-    marker.setPointerCapture(event.pointerId);
+    (grip || marker).setPointerCapture(event.pointerId);
   });
   plan.addEventListener("pointermove", event => {
     if (drag?.pointer !== event.pointerId) return;
     const dx = event.clientX - drag.startX;
     const dy = event.clientY - drag.startY;
-    if (!drag.moved && Math.hypot(dx, dy) < 5) return;
-    drag.moved = true;
-    moveWaiterTable(drag.table, drag.marker, drag.x + dx * waiterRoom.width / plan.clientWidth,
-      drag.y + dy * drag.height / plan.clientHeight, drag.height);
+    if (!drag.moved) {
+      if (Math.hypot(dx, dy) < 5) return;
+      drag.moved = true;
+      selectWaiterTable(Number(drag.marker.dataset.index));
+    }
+    const x = dx * waiterRoom.width / plan.clientWidth;
+    const y = dy * drag.height / plan.clientHeight;
+    if (drag.axis) {
+      stretchWaiterTable(drag.table, drag.marker, drag.size.w + (drag.axis === "x" ? x : 0),
+        drag.size.h + (drag.axis === "y" ? y : 0), drag.height);
+    } else {
+      moveWaiterTable(drag.table, drag.marker, drag.x + x, drag.y + y, drag.height);
+    }
   });
   plan.addEventListener("lostpointercapture", event => {
     if (drag?.pointer !== event.pointerId) return;
-    if (drag.moved) saveNow();
+    if (drag.moved) {
+      suppressClick = true;
+      saveNow();
+    }
     drag = null;
   });
+  plan.addEventListener("pointerup", event => {
+    if (event.pointerType !== "touch" || drag?.pointer !== event.pointerId || drag.moved || drag.axis) return;
+    suppressClick = true;
+    selectWaiterTable(Number(drag.marker.dataset.index), true);
+  });
   plan.addEventListener("click", event => {
+    if (suppressClick && event.detail) return;
     const marker = event.target.closest("[data-index]");
-    if (marker) selectWaiterTable(Number(marker.dataset.index));
+    if (marker) selectWaiterTable(Number(marker.dataset.index), true);
+    else if (!event.target.closest("[data-resize]")) selectWaiterTable(-1);
   });
   plan.addEventListener("keydown", event => {
     const direction = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] }[event.key];
-    const marker = event.target.closest("[data-index]");
+    const grip = event.target.closest("[data-resize]");
+    const marker = grip ? waiterMarker() : event.target.closest("[data-index]");
     if (!direction || !marker) return;
     event.preventDefault();
     const tables = waiterMemo().tables;
     const table = tables[marker.dataset.index];
-    moveWaiterTable(table, marker, table.x + direction[0] * 8, table.y + direction[1] * 8, waiterPlanHeight(tables));
+    const height = waiterPlanHeight(tables);
+    if (grip) {
+      const { w, h } = waiterTableSize(table);
+      stretchWaiterTable(table, marker, w + (grip.dataset.resize === "x" ? direction[0] * 8 : 0),
+        h + (grip.dataset.resize === "y" ? direction[1] * 8 : 0), height);
+    } else {
+      moveWaiterTable(table, marker, table.x + direction[0] * 8, table.y + direction[1] * 8, height);
+    }
+    positionWaiterEditor();
     save();
   });
 }
@@ -343,36 +447,48 @@ async function downloadWaiterMemo() {
 
 function initWaiterMemo() {
   const plan = $("waiterPlan");
-  if (!plan) return;
+  const editor = $("waiterEditor");
+  const done = $("closeWaiterEditor");
+  if (!plan || !done) return;
   initWaiterDrag(plan);
+  const close = () => {
+    if (!editor.hidden && !$("waiterGuestsField").hidden && !$("waiterGuests").reportValidity()) return;
+    editor.hidden = true;
+    waiterMarker()?.focus({ preventScroll: true });
+  };
+  done.onclick = close;
+  $("waiterMemo").addEventListener("toggle", event => {
+    if (!event.target.open) selectWaiterTable(-1);
+  });
+  document.addEventListener("click", event => {
+    if (!event.target.closest("#waiterEditor, #waiterPlan, #addWaiterTable, #addWaiterLandmark")) editor.hidden = true;
+  });
+  document.addEventListener("keydown", event => {
+    if (event.key === "Escape" && !editor.hidden) close();
+  });
+  window.addEventListener("scroll", positionWaiterEditor, { passive: true });
+  window.addEventListener("resize", positionWaiterEditor);
+  window.visualViewport?.addEventListener("resize", positionWaiterEditor);
+  window.visualViewport?.addEventListener("scroll", positionWaiterEditor);
   const add = shape => {
     const tables = waiterMemo().tables;
     tables.push({ name: "", guests: "", note: "", shape });
     renderWaiterPlan();
-    selectWaiterTable(tables.length - 1);
-    $("waiterName").focus();
+    waiterMarker(tables.length - 1).scrollIntoView({ block: "nearest" });
+    selectWaiterTable(tables.length - 1, true);
     save();
   };
   $("addWaiterTable").onclick = () => add("rect");
   $("addWaiterLandmark").onclick = () => add("landmark");
-  if ($("waiterSizeFields")) {
-    [["waiterLength", "length", 12], ["waiterWidth", "width", 8]].forEach(([id, field, max]) => {
-      const select = $(id);
-      for (let size = 2; size <= max; size++) select.add(new Option(size, size));
-      select.onchange = () => resizeWaiterTable({ [field]: Number(select.value) });
-    });
-    $("rotateWaiterTable").onclick = () => {
-      const table = waiterMemo().tables[selectedWaiterTable];
-      if (table) resizeWaiterTable({ turned: !table.turned });
-    };
-  }
+  $("rotateWaiterTable").onclick = rotateWaiterTable;
   const fields = { waiterName: "name", waiterGuests: "guests", waiterShape: "shape", waiterNote: "note" };
   Object.entries(fields).forEach(([id, field]) => {
     $(id).addEventListener("input", event => {
       const table = waiterMemo().tables[selectedWaiterTable];
       if (!table || !event.target.validity.valid) return;
       table[field] = event.target.value;
-      updateWaiterMarker(plan.querySelector('[data-index="' + selectedWaiterTable + '"]'), table, selectedWaiterTable);
+      updateWaiterMarker(waiterMarker(), table, selectedWaiterTable);
+      if (field === "name") $("waiterEditorTitle").textContent = waiterName(table, selectedWaiterTable);
       updateWaiterTotal();
       save();
     });
@@ -390,7 +506,7 @@ function initWaiterMemo() {
   $("waiterServing").addEventListener("input", event => { waiterMemo().serving = event.target.value; save(); });
   $("bGuests").addEventListener("input", updateWaiterTotal);
   $("saveWaiterBanquet").onclick = () => {
-    if (!$("waiterEditor").hidden && !$("waiterGuests").reportValidity()) return;
+    if (!editor.hidden && !$("waiterGuestsField").hidden && !$("waiterGuests").reportValidity()) return;
     $("saveBanq").click();
     saveNow();
   };
