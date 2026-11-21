@@ -29,8 +29,9 @@ window.RIZZW_SEED.rev = "2026-11-17-lux-portions-v5";
   window.RIZZW_SEED.dishes.forEach(function (d) { var x = c[d.id]; if (x) { d.cost = x[0]; d.star = x[1]; if (d.group === "Нет в выгрузке Айко") d.group = "Хлеб и напитки (техкарта Айко)"; } });
 })();
 // Подтверждённые цены за порцию 200 мл: чай 2 ₽, кофе 22 ₽. Справочник хранит ставки за литр.
+// Молоко, лимон и сахар: 3 + 9 + 1 ₽ за 55 г. Справочник хранит ставку за кг.
 (function () {
-  var drinks = { d99: 10, d100: 110 };
+  var drinks = { d99: 10, d100: 110, d101: 13 * 1000 / 55 };
   window.RIZZW_SEED.dishes.forEach(function (d) {
     if (drinks[d.id] === undefined) return;
     d.cost = drinks[d.id];

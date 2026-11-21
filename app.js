@@ -23,7 +23,7 @@ function normDB(d) {
   d.settings = Object.assign({}, SEED.settings, d.settings || {});
   d.rev = d.rev || SEED.rev;
   // Заполняем пропуски в сохранённом справочнике, сохраняя цены, введённые вручную.
-  for (const id of ["d99", "d100"]) {
+  for (const id of ["d99", "d100", "d101"]) {
     const saved = d.dishes.find(dish => dish.id === id);
     const published = SEED.dishes.find(dish => dish.id === id);
     if (!saved || fin(saved.cost) || !fin(published?.cost)) continue;
