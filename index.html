@@ -103,12 +103,26 @@ body.guest .int{display:none!important}
 .switch{display:flex;align-items:center;gap:6px;font-size:.85rem;color:var(--muted);cursor:pointer;user-select:none}
 .switch input{width:auto}
 #printArea{display:none}
+#waiterPrintArea{display:none}
+#waiterMemo .memo-fields,#waiterTables{display:grid;gap:10px;margin-top:12px}
+.memo-table{display:grid;grid-template-columns:minmax(0,1fr) minmax(75px,110px) auto;gap:8px;align-items:end}
+.memo-table .memo-table-note{grid-column:1/-1}
+#waiterMemo textarea{min-height:64px;font-family:inherit;resize:vertical}
 @media print{
 body{background:#fff;color:#000}
-.wrap{display:none}
+.wrap,.mbar,.toast{display:none!important}
 #printArea{display:block;font-family:var(--font-ui);padding:12mm;color:#000}
 #printArea table{width:100%;border-collapse:collapse}
 #printArea td,#printArea th{border-bottom:1px solid #ccc;padding:4px 6px;color:#000}
+body.print-waiters #printArea{display:none}
+@page waiter-memo{size:A4;margin:12mm}
+body.print-waiters:not(.guest):not(.locked) #waiterPrintArea{display:block;page:waiter-memo;color:#000;font-size:11pt}
+#waiterPrintArea h1{font-size:18pt}
+#waiterPrintArea h2{margin-top:5mm}
+#waiterPrintArea th,#waiterPrintArea td{color:#000;border-color:#aaa;white-space:pre-wrap;overflow-wrap:anywhere}
+#waiterPrintArea td{vertical-align:top}
+#waiterPrintArea tr{break-inside:avoid}
+#waiterPrintArea p{white-space:pre-wrap;overflow-wrap:anywhere}
 }
 .sharebar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between}
 .mbar{display:none}
@@ -194,6 +208,18 @@ body.locked .wrap,body.locked .mbar{display:none!important}
 <div class="tw" style="margin-top:10px"><table style="min-width:420px">
 <thead><tr><th>Блюдо</th><th class="r">На гостя</th><th class="r">Всего</th></tr></thead>
 <tbody id="kitBody"></tbody></table></div>
+</details>
+</div>
+<div class="panel int">
+<details id="waiterMemo">
+<summary>Памятка для официантов</summary>
+<div class="memo-fields">
+<label class="f">Расстановка столов<textarea id="waiterLayout" rows="2" placeholder="Например, столы вдоль окон, проход к выходу оставить свободным"></textarea></label>
+<div id="waiterTables"></div>
+<div class="row"><button type="button" class="ghost" id="addWaiterTable">+ Добавить стол</button><span class="small muted" id="waiterTotal" aria-live="polite"></span></div>
+<label class="f">Заметки по сервировке<textarea id="waiterServing" rows="2" placeholder="Например, воду и бокалы поставить до прихода гостей"></textarea></label>
+<div class="row"><button type="button" class="pri" id="printWaiterMemo">Распечатать памятку</button></div>
+</div>
 </details>
 </div>
 </div>
@@ -311,12 +337,14 @@ body.locked .wrap,body.locked .mbar{display:none!important}
 </div>
 <div class="mbar" id="mbar"><span>Доплата <b id="mRec">—</b></span><span>Итого <b id="mTot">—</b></span><button type="button" id="mGo">К смете ↓</button></div>
 <div id="printArea"></div>
+<div id="waiterPrintArea"></div>
 <datalist id="dishList"></datalist>
 <div class="toast" id="toast" hidden></div>
 <script>window.RIZZW_PIN="c9f1b1bcf684433fe9b58d452274e074278c6e39a7b1950325ca60056075b9c2";</script>
 <script src="data.js"></script>
 <script src="patch.js"></script>
-<script src="app.js"></script>
+<script src="waiters.js"></script>
+<script src="app.js?v=20261121"></script>
 <script src="extra.js"></script>
-<script src="exports.js"></script>
+<script src="exports.js?v=20261121"></script>
 </body></html>

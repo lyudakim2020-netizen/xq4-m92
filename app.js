@@ -188,6 +188,7 @@ $("bPkg").innerHTML = DB.packages.map(p => `<option value="${p.id}"${p.id === B.
 $("bClient").value = B.client || ""; $("bDate").value = B.date || ""; $("bGuests").value = fin(num(B.guests)) ? B.guests : "";
 $("bManual").value = fin(num(B.manual)) ? B.manual : ""; $("bDisc").value = fin(num(B.disc)) ? B.disc : ""; $("bSvcOn").checked = !!B.svcOn;
 renderMenu(); renderSvc(); recalc();
+window.renderWaiterMemo?.();
 }
 function renderMenu() {
 let html = "", last = null;
@@ -591,5 +592,6 @@ else { $("gateErr").hidden = false; $("gatePin").select(); }
 })();
 /* ---------- старт ---------- */
 load();
+window.initWaiterMemo?.();
 let t0 = "banq"; try { t0 = localStorage.getItem(KEY + "-tab") || "banq"; } catch (e) {}
 showTab(t0);
