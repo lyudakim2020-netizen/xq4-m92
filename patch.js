@@ -1,6 +1,6 @@
 // оставляем только типовые пакеты; настройки фуршета по умолчанию
 window.RIZZW_SEED.packages = window.RIZZW_SEED.packages.filter(p => p.kind === "package");
-window.RIZZW_SEED.rev = "2026-11-25-fur-150-plus-70-v1";
+window.RIZZW_SEED.rev = "2026-11-25-fur-original-portions-v2";
 // 22.10: цены пакетов по решению Люды: Гриль 5 300, Дорадо 6 400, Лосось 7 700 (19.10 временно были 4 800 / 5 980 / 7 200)
 (function () {
   var P = { p1: 5300, p2: 6400, p3: 7700 };
@@ -261,53 +261,61 @@ Object.assign(window.RIZZW_SEED.settings, { furTarget: 16, furFloor: 17, furMin:
   p.price = 10000;
   p.note = "Каждый гость выбирает один салат (220 г), одно горячее (120 г) и один гарнир (120 г). Морс и пунш — по 400 мл каждого на гостя. Чай и кофе — по одной порции. Для базовой себестоимости выбраны самые дорогие варианты по справочнику: салат с ростбифом, утка, спаржа.";
 })();
-// 25.11: общий стол на 220 гостей: исходный фуршет на 150 + техкарта дозаказа на 70.
-// Сохраняем фактический объём двух заказов, нормируем среднюю порцию на всех 220.
+// 25.11, исправление: исходные нормы пакета не меняем. Добавляем только 5 отсутствовавших блюд.
+// Порции новых блюд рассчитаны по техкарте дозаказа на 70 человек.
 (function () {
   var S=window.RIZZW_SEED,p=S.packages.find(function(x){return x.id==="p-furshet-november";});
   if(!p)return;
-  var before=JSON.parse(JSON.stringify(p.lines)),baseGuests=150,totalGuests=220,updates={},additionCost=0,baseCost=0;
-  var add=[
-    {old:"d17",id:"fn-nov25-fruits",name:"Фруктовая ваза",kg:11,cost:4411.44,sec:"Фрукты"},
-    {id:"fn-nov25-pork",name:"Колбаски свиные на гриле",kg:10,cost:5758.20,sec:"Основное блюдо"},
-    {id:"fn-nov25-wings",name:"Куриные крылья",kg:10,cost:2857.40,sec:"Основное блюдо"},
-    {id:"fn-nov25-meatballs",name:"Фрикадельки из индейки",kg:10,cost:6000,sec:"Основное блюдо",sourceEstimated:true},
-    {old:"d2",id:"fn-nov25-potatoes",name:"Картофель мини пряный",kg:5,cost:561,sec:"Гарнир"},
-    {old:"d38",id:"fn-nov25-vegetables",name:"Овощи на гриле",kg:6,cost:2533.44,sec:"Гарнир"},
-    {id:"fn-nov25-cheese",name:"Сырное плато",kg:6,cost:6479.34,sec:"Закуски"},
-    {id:"fn-nov25-bbq",name:"Соус Барбекю",kg:.5,cost:243.94,sec:"Дополнительно"}
+  var original=JSON.parse(JSON.stringify(p.lines)),lineMap={},oldBad={};
+  var additions=[
+    {id:"fn-nov25-pork",title:"Колбаски свиные на гриле",kg:10,cost:5758.20,sec:"Основное блюдо"},
+    {id:"fn-nov25-wings",title:"Куриные крылья",kg:10,cost:2857.40,sec:"Основное блюдо"},
+    {id:"fn-nov25-meatballs",title:"Фрикадельки из индейки",kg:10,cost:6000,sec:"Основное блюдо",sourceEstimated:true},
+    {id:"fn-nov25-cheese",title:"Сырное плато",kg:6,cost:6479.34,sec:"Закуски"},
+    {id:"fn-nov25-bbq",title:"Соус Барбекю",kg:.5,cost:243.94,sec:"Дополнительно"}
   ];
-  before.forEach(function(l){var d=S.dishes.find(function(x){return x.id===l.dish;});baseCost+=(d.unit==="шт"?l.pcs*d.cost:l.g/1000*d.cost)*baseGuests;});
-  p.lines.forEach(function(l){
-    var old=l.dish,extra=add.find(function(x){return x.old===old;});
-    if(extra){
-      var d=S.dishes.find(function(x){return x.id===old;}),kg=l.g/1000*baseGuests+extra.kg,cost=l.g/1000*baseGuests*d.cost+extra.cost;
-      S.dishes.push({id:extra.id,name:extra.name,group:"Фуршет ноябрь — 150 + 70",unit:"кг",cost:cost/kg});
-      l.dish=extra.id;l.g=kg*1000/totalGuests;
-    }else{l.g=(l.g||0)*baseGuests/totalGuests;if(typeof l.pcs==="number")l.pcs=l.pcs*baseGuests/totalGuests;}
-    updates[old]=l;
+  var archive=[
+    {old:"d17",id:"fn-nov25-fruits",kg:11,cost:4411.44},
+    {old:"d2",id:"fn-nov25-potatoes",kg:5,cost:561},
+    {old:"d38",id:"fn-nov25-vegetables",kg:6,cost:2533.44}
+  ];
+  original.forEach(function(l){
+    lineMap[l.dish]=l;
+    oldBad[l.dish]={g:(l.g||0)*150/220,pcs:typeof l.pcs==="number"?l.pcs*150/220:undefined};
   });
-  add.forEach(function(x){
-    additionCost+=x.cost;if(x.old)return;
-    S.dishes.push({id:x.id,name:x.name,group:"Фуршет ноябрь — 150 + 70",unit:"кг",cost:x.cost/x.kg,sourceEstimated:!!x.sourceEstimated});
-    p.lines.push({sec:x.sec,title:x.name,dish:x.id,g:x.kg*1000/totalGuests});
+  archive.forEach(function(a){
+    var l=lineMap[a.old],d=S.dishes.find(function(x){return x.id===a.old;}),kg=l.g/1000*150+a.kg;
+    // Старые ошибочные IDs сохраняются только для ранее сохранённых исторических записей.
+    S.dishes.push({id:a.id,name:d.name,group:"Архив расчёта 150 + 70",unit:"кг",cost:(l.g/1000*150*d.cost+a.cost)/kg});
+    lineMap[a.id]=l;oldBad[a.id]={g:kg*1000/220};
   });
-  p.batchBasis={baseGuests:150,additionalGuests:70,totalGuests:220,baseFoodCost:baseCost,additionalFoodCost:additionCost};
-  p.note="Общий фуршет 150 + 70 = 220 гостей. Порции — среднее на гостя: исходный пакет на 150 и весь дозаказ шефа на 70. Фрукты, картофель и овощи объединены без повторов; пять новых блюд добавлены. Количество порций канапе в первом заказе не увеличивалось.";
-  // Обновляем только неизменённые строки открытого расчёта. Ручные замены и история сохраняются.
+  additions.forEach(function(a){
+    S.dishes.push({id:a.id,name:a.title,group:"Фуршет ноябрь — дозаказ",unit:"кг",cost:a.cost/a.kg,sourceEstimated:!!a.sourceEstimated});
+    var l={sec:a.sec,title:a.title,dish:a.id,g:a.kg*1000/70};
+    p.lines.push(l);lineMap[a.id]=l;oldBad[a.id]={g:a.kg*1000/220};
+  });
+  p.supplementBasis={guests:70,addedFoodCost:21338.88};
+  p.note="Исходные порции сохранены: канапе по 1 шт., брускетты по 2 шт. Добавлены пять блюд из техкарты дозаказа на 70 человек. Фрукты, картофель и овощи не дублировались и их прежние граммовки не менялись.";
   try{
-    var flag="rizzw-fur-150-plus-70-20261125";
+    var flag="rizzw-fur-restore-portions-20261125";
+    function near(a,b){return a==null&&b==null||Number.isFinite(Number(a))&&Number.isFinite(Number(b))&&Math.abs(Number(a)-Number(b))<1e-7;}
     if(!localStorage.getItem(flag)){
       var state=JSON.parse(localStorage.getItem("rizzw-banquet-calc-v1")||"null");
       if(state&&state.cur&&state.cur.pkg===p.id&&Array.isArray(state.cur.rows)){
-        state.cur.rows.forEach(function(r){var l=updates[r.dish],old=before.find(function(x){return x.dish===r.dish;});if(!l||!old||!r.base||r.dish!==r.base.dish||r.g!==r.base.g||r.pcs!==r.base.pcs)return;r.dish=l.dish;r.g=l.g;r.pcs=l.pcs;r.base={dish:l.dish,g:l.g,pcs:l.pcs};});
-        add.filter(function(x){return !x.old;}).forEach(function(x){if(state.cur.rows.some(function(r){return r.dish===x.id;}))return;var l=p.lines.find(function(r){return r.dish===x.id;});state.cur.rows.push({sec:l.sec,title:l.title,dish:l.dish,g:l.g,base:{dish:l.dish,g:l.g},removed:false});});
+        state.cur.rows.forEach(function(r){
+          var l=lineMap[r.dish],bad=oldBad[r.dish];if(!l)return;
+          var untouched=r.base&&r.dish===r.base.dish&&near(r.g,r.base.g)&&near(r.pcs,r.base.pcs);
+          if(untouched||bad&&near(r.g,bad.g)&&near(r.pcs,bad.pcs)){
+            r.dish=l.dish;r.g=l.g;r.pcs=l.pcs;r.base={dish:l.dish,g:l.g,pcs:l.pcs};
+          }else if(r.dish!==l.dish){r.dish=l.dish;if(r.base&&lineMap[r.base.dish])r.base.dish=l.dish;}
+        });
+        additions.forEach(function(a){if(state.cur.rows.some(function(r){return r.dish===a.id;}))return;var l=lineMap[a.id];state.cur.rows.push({sec:l.sec,title:l.title,dish:l.dish,g:l.g,base:{dish:l.dish,g:l.g},removed:false});});
         localStorage.setItem("rizzw-banquet-calc-v1",JSON.stringify(state));
       }
       var fur=JSON.parse(localStorage.getItem("rizzw-banquet-calc-v1-fur")||"null");
       if(fur&&fur.packageId===p.id&&Array.isArray(fur.rows)){
-        fur.rows.forEach(function(r){var l=updates[r.dish],old=before.find(function(x){return x.dish===r.dish;});if(!l||!old)return;var d=S.dishes.find(function(x){return x.id===old.dish;}),q=d.unit==="шт"?old.pcs:old.g;if(Number(r.qty)!==q)return;r.dish=l.dish;r.qty=d.unit==="шт"?l.pcs:l.g;});
-        add.filter(function(x){return !x.old;}).forEach(function(x){if(fur.rows.some(function(r){return r.dish===x.id;}))return;var l=p.lines.find(function(r){return r.dish===x.id;});fur.rows.push({dish:l.dish,title:l.title,qty:l.g});});
+        fur.rows.forEach(function(r){var l=lineMap[r.dish],bad=oldBad[r.dish];if(!l)return;var d=S.dishes.find(function(x){return x.id===r.dish;}),q=d.unit==="шт"?l.pcs:l.g,badQ=d.unit==="шт"?bad.pcs:bad.g;if(near(r.qty,badQ)||near(r.qty,q))r.qty=q;r.dish=l.dish;});
+        additions.forEach(function(a){if(fur.rows.some(function(r){return r.dish===a.id;}))return;var l=lineMap[a.id];fur.rows.push({dish:l.dish,title:l.title,qty:l.g});});
         localStorage.setItem("rizzw-banquet-calc-v1-fur",JSON.stringify(fur));
       }
       localStorage.setItem(flag,"1");
