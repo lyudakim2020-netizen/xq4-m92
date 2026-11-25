@@ -10,14 +10,15 @@
     const fur=kind==="fur", s=fur?FS:B, c=fur?furCalc():calc();
     c.dt=c.dt||parseD(s.date);
     const rows=fur?s.rows:B.rows.filter(r=>!r.removed);
-    const sections=[];
+    const sections=[], batchMode=rows.some(r=>r.batch);
     rows.forEach(r=>{
       const d=dishById(r.dish), qty=fur?r.qty:d&&d.unit==="шт"?r.pcs:r.g;
-      const sec=fur?((DB.packages.find(p=>p.id===s.packageId)||{}).lines||[]).find(l=>l.dish===r.dish)?.sec||"Меню":r.sec||"Меню";
+      const rawSec=fur?((DB.packages.find(p=>p.id===s.packageId)||{}).lines||[]).find(l=>l.dish===r.dish)?.sec||"Меню":r.sec||"Меню";
+      const sec=r.batch?menuBatchTitle(r)+" — "+rawSec:rawSec;
       let section=sections.find(g=>g.name===sec);if(!section){section={name:sec,rows:[]};sections.push(section);}
-      section.rows.push({name:r.title||d?.name||"Позиция",qty:count(qty,d?.unit==="шт"?"шт.":d?.unit==="л"?"мл":"г")});
+      section.rows.push({name:r.title||d?.name||"Позиция",qty:r.batch?count(qty*menuRowGuests(r,c.G)/(d?.unit==="шт"?1:1000),d?.unit==="шт"?"шт.":d?.unit==="л"?"л":"кг"):count(qty,d?.unit==="шт"?"шт.":d?.unit==="л"?"мл":"г")});
     });
-    sections.sort((a,b)=>{const ai=SECS.indexOf(a.name),bi=SECS.indexOf(b.name);return (ai<0?99:ai)-(bi<0?99:bi);});
+    if(!batchMode)sections.sort((a,b)=>{const ai=SECS.indexOf(a.name),bi=SECS.indexOf(b.name);return (ai<0?99:ai)-(bi<0?99:bi);});
     const extras=[];
     function extra(group,row){let g=extras.find(x=>x.name===group);if(!g){g={name:group,rows:[]};extras.push(g);}g.rows.push(row);}
     if(!fur){DB.services.forEach(x=>{const q=num(s.svc[x.id]);if(q>0)extra(x.grp,{name:x.name,qty:count(q,x.unit==="час"?"ч":x.unit==="шт"?"шт.":"усл."),price:x.price,amount:q*x.price});});
@@ -30,7 +31,7 @@
     const extrasTotal=extras.reduce((a,g)=>a+g.rows.reduce((b,r)=>b+r.amount,0),0);
     if(extrasTotal)summary.push({label:"Напитки отдельно, аренда и услуги",value:extrasTotal});
     summary.push({label:"ИТОГО",value:c.total,total:true},{label:"Предоплата "+fm(num(DB.settings.prepay))+"%",value:c.pre},{label:"Остаток к оплате",value:c.total-c.pre});
-    return {kind,title:fur?"Фуршетное меню":"Банкетное меню",client:s.client||"",date:s.date?fmtD(parseD(s.date)):"не указана",guests:c.G,sections,extras,summary,per,c,state:s,
+    return {kind,batchMode,quantityTitle:batchMode?"Всего на стол\n(кг / л / шт.)":"Выход на человека\n(г / мл / шт.)",title:fur?"Фуршетное меню":"Банкетное меню",client:s.client||"",date:s.date?fmtD(parseD(s.date)):"не указана",guests:c.G,sections,extras,summary,per,c,state:s,
       filename:safe((fur?"Фуршет":"Банкет")+(s.client?" — "+s.client:"")+(s.date?" — "+s.date:""))||"Смета"};
   }
   function headerHtml(m,internal) {return `<div class="estimate-head"><div><h1>${esc(internal?"Расчёт для нас":m.title)}</h1>${m.client?`<p>${esc(m.client)}</p>`:""}</div><div class="estimate-logo">RizzW<small>БАНКЕТНЫЙ ЗАЛ</small></div></div><div class="estimate-meta"><span>Дата мероприятия: <b>${esc(m.date)}</b></span><span>Гостей: <b>${fm(m.guests)}</b></span></div>`;}
@@ -41,6 +42,7 @@
     const total=fur?c.directCost:c.foodCost,revenue=fur?c.directRevenue:c.directRevenue;
     const rows=[{section:"Сводный расчёт"},
       {name:"Еда и напитки пакета",per:G>0?food/G:NaN,total:food},
+      ...[...new Set((fur?FS.rows:B.rows).filter(r=>r.batch).map(r=>r.batch))].map(batch=>{const rr=(fur?FS.rows:B.rows).filter(r=>r.batch===batch&&!r.removed),total=rr.reduce((a,r)=>a+lineCost(r.dish,fur?r.qty:r.g,fur?r.qty:r.pcs)*menuRowGuests(r,G),0);return {name:menuBatchTitle(rr[0]),per:G>0?total/G:NaN,total};}),
       {name:"Посуда и аренда мармитов",per:suppliesCost(m.state),total:supplies},
       {name:"В том числе аренда мармитов",per:G>0?marmiteCost(m.state)/G:NaN,total:marmiteCost(m.state)},
       {name:"Пиво — себестоимость",per:G>0?c.beer.cost/G:NaN,total:c.beer.cost},
@@ -51,7 +53,7 @@
     suppliesLines(m.state).forEach(r=>rows.push({name:r.name+" · "+count(r.qty,"шт./гость")+" × "+money(r.cost),per:r.qty*r.cost,total:G>0?r.qty*r.cost*G:NaN}));
     if(marmiteCost(m.state)>0)rows.push({name:"Аренда мармитов — на мероприятие",per:G>0?marmiteCost(m.state)/G:NaN,total:marmiteCost(m.state)});
     rows.push({section:"Еда и напитки пакета — детализация"});
-    (fur?FS.rows:B.rows.filter(r=>!r.removed)).forEach(r=>{const per=fur?fRowCost(r):lineCost(r.dish,r.g,r.pcs);rows.push({name:r.title,per,total:G>0?per*G:NaN});});
+    (fur?FS.rows:B.rows.filter(r=>!r.removed)).forEach(r=>{const raw=fur?lineCost(r.dish,r.qty,r.qty):lineCost(r.dish,r.g,r.pcs),total=raw*menuRowGuests(r,G),per=G>0?total/G:NaN;rows.push({name:(r.batch?menuBatchTitle(r)+" — ":"")+r.title,per,total});});
     return rows;
   }
   function documentHtml(m,internal) {
@@ -60,7 +62,7 @@
     const totals=`<table class="estimate-totals"><tbody>${m.summary.map(r=>`<tr class="${r.total?"grand":""}"><td>${esc(r.label)}</td><td class="amount">${money(r.value)}</td></tr>`).join("")}</tbody></table>`;
     let html=headerHtml(m,internal);
     if(internal)html+=`<p class="estimate-private">ВНУТРЕННИЙ РАСЧЁТ · НЕ ДЛЯ ГОСТЯ</p><table><thead><tr><th>Позиция</th><th>На гостя, ₽</th><th>Всего, ₽</th></tr></thead><tbody>${internalRows(m).map(r=>r.section?`<tr class="section"><th colspan="3">${esc(r.section)}</th></tr>`:`<tr class="${r.totalRow?"grand":""}"><td>${esc(r.name)}</td><td class="amount">${money(r.per)}</td><td class="amount">${money(r.total)}</td></tr>`).join("")}</tbody></table>`;
-    else {html+=`<div class="estimate-price">Меню на гостя: <b>${money(m.per)}</b></div><h2>1. Меню</h2><table><colgroup><col style="width:77%"><col style="width:23%"></colgroup><thead><tr><th>Наименование блюда</th><th>Выход на человека<br>(г / мл / шт.)</th></tr></thead>${menu}</table>`;
+    else {html+=`<div class="estimate-price">Меню на гостя: <b>${money(m.per)}</b></div><h2>1. Меню</h2><table><colgroup><col style="width:77%"><col style="width:23%"></colgroup><thead><tr><th>Наименование блюда</th><th>${esc(m.quantityTitle).replace(/\n/g,"<br>")}</th></tr></thead>${menu}</table>`;
       if(m.extras.length)html+=`<div class="estimate-break"></div><h2>2. Дополнительные услуги и напитки</h2><table><thead><tr><th>Наименование</th><th>Количество</th><th>Стоимость, ₽</th></tr></thead>${extras}</table>`;
       html+=`<h2>Итоговая стоимость</h2>${totals}`;
       if(m.c.dt)html+=`<p class="estimate-foot">Остаток к оплате до ${fmtD(minusDays(m.c.dt,num(DB.settings.payDays)||0))}.</p>`;
@@ -87,7 +89,7 @@
       internalRows(m).forEach(r=>body.push(r.section?band(r.section,3):[{text:r.name,bold:!!r.totalRow},{text:money(r.per),alignment:"right",bold:!!r.totalRow},{text:money(r.total),alignment:"right",bold:!!r.totalRow}]));content.push(pdfTable(body,["*",85,95]));
     }else{
       content.push({text:["Меню на гостя: ",{text:money(m.per),bold:true}],margin:[0,0,0,12]},{text:"1. Меню",bold:true,fontSize:12,margin:[0,0,0,8]});
-      const body=[[pHead("Наименование блюда"),pHead("Выход на человека\n(г / мл / шт.)")]];
+      const body=[[pHead("Наименование блюда"),pHead(m.quantityTitle)]];
       m.sections.forEach(g=>{body.push(band(g.name,2));g.rows.forEach(r=>body.push([r.name,{text:r.qty,alignment:"center"}]));});
       content.push(pdfTable(body,["*",110]));
       if(m.extras.length){content.push({text:"2. Дополнительные услуги и напитки",bold:true,fontSize:12,pageBreak:"before",margin:[0,0,0,12]});const extra=[[pHead("Наименование"),pHead("Количество"),pHead("Стоимость, ₽")]];
@@ -111,7 +113,7 @@
     if(m.client)wide(m.client,{font:{name:"Arial",sz:11,bold:true}},25);
     pair("Дата мероприятия",m.date);pair("Количество гостей",m.guests);pair("Меню на одного гостя",m.per);
     wide("1. Меню",{font:{name:"Arial",sz:12,bold:true}},24);
-    let r=row([baseCell("Наименование блюда"),"","","",baseCell("Выход на человека\n(г / мл / шт.)"),""],30);merge(r,0,3);merge(r,4,5);
+    let r=row([baseCell("Наименование блюда"),"","","",baseCell(m.quantityTitle),""],30);merge(r,0,3);merge(r,4,5);
     const headers=[r],bands=[];
     m.sections.forEach(g=>{bands.push(wide(g.name,{fill:{fgColor:{rgb:GREY}},font:{name:"Arial",sz:10,bold:true}},18));g.rows.forEach(x=>{const rr=row([baseCell(x.name),"","","",baseCell(x.qty,{alignment:{horizontal:"center",vertical:"center"}}),""],x.name.length>62?30:18);merge(rr,0,3);merge(rr,4,5);});});
     if(m.extras.length){extrasBreak=wide("2. Дополнительные услуги и напитки",{font:{name:"Arial",sz:12,bold:true}},30);r=row([baseCell("Наименование"),"","","",baseCell("Количество"),baseCell("Стоимость, ₽")],30);merge(r,0,3);headers.push(r);

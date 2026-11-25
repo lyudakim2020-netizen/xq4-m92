@@ -322,6 +322,38 @@ Object.assign(window.RIZZW_SEED.settings, { furTarget: 16, furFloor: 17, furMin:
     }
   }catch(e){}
 })();
+// 25.11: две независимые партии приготовления, единая цена за гостя.
+(function(){
+ var S=window.RIZZW_SEED,p=S.packages.find(x=>x.id==="p-furshet-november");if(!p)return;
+ S.rev="2026-11-25-fur-two-orders-v3";
+ var main=p.lines.slice(0,22).map(l=>Object.assign({},l,{batch:"main",batchLabel:"Основной фуршет",servings:150}));
+ main.find(l=>/тортилья/i.test(l.title)).pcs=2;
+ main.find(l=>/ростбиф/i.test(l.title)).pcs=1;
+ var add=[
+ ["fruits","Фруктовая ваза",11,4411.44,"Фрукты"],
+ ["pork","Колбаски свиные на гриле",10,5758.20,"Основное блюдо"],
+ ["wings","Куриные крылья",10,2857.40,"Основное блюдо"],
+ ["meatballs","Фрикадельки из индейки",10,6000,"Основное блюдо"],
+ ["potatoes","Картофель мини пряный",5,561,"Гарнир"],
+ ["vegetables","Овощи на гриле",6,2533.44,"Гарнир"],
+ ["cheese","Сырное плато",6,6479.34,"Закуски"],
+ ["bbq","Соус Барбекю",.5,243.94,"Дополнительно"]];
+ var extra=add.map(a=>{var id="fn-order70-"+a[0];S.dishes.push({id:id,name:a[1],group:"Дозаказ на 70 гостей",unit:"кг",cost:a[3]/a[2]});return {dish:id,title:a[1],sec:a[4],g:a[2]*1000/70,batch:"extra",batchLabel:"Дополнительное меню",servings:70};});
+ p.lines=main.concat(extra);p.price=3700;p.orderGuests=220;p.batchPlan=true;
+ p.note="Цена 3 700 ₽ за каждого гостя. Основной фуршет готовится на 150, дополнительное меню — на 70. Общее число гостей меняет выручку; объёмы приготовления задаются отдельно в двух блоках.";
+ delete p.supplementBasis;
+ try{
+  var key="rizzw-banquet-calc-v1",state=JSON.parse(localStorage.getItem(key)||"null"),flag="rizzw-two-orders-20261125";
+  function rows(old,fur){return p.lines.map(l=>{var r=l.batch==="main"?(old||[]).find(x=>x.dish===l.dish):null;var x=Object.assign({},r||{},l);if(fur){x.qty=r?r.qty:(S.dishes.find(d=>d.id===l.dish).unit==="шт"?l.pcs:l.g);if(/тортилья/i.test(l.title))x.qty=2;if(/ростбиф/i.test(l.title))x.qty=1;}else{x.base={dish:l.dish,g:l.g,pcs:l.pcs};x.removed=!!(r&&r.removed);}return x;});}
+  if(state&&state.db&&state.db.rev!==S.rev){var i=state.db.packages.findIndex(x=>x.id===p.id);if(i>=0)state.db.packages[i]=JSON.parse(JSON.stringify(p));else state.db.packages.push(p);S.dishes.filter(d=>d.id.startsWith("fn-order70-")).forEach(d=>{if(!state.db.dishes.some(x=>x.id===d.id))state.db.dishes.push(d);});state.db.rev=S.rev;}
+  if(!localStorage.getItem(flag)){
+   if(state&&state.cur&&state.cur.pkg===p.id){state.cur.rows=rows(state.cur.rows,false);state.cur.guests=220;state.cur.manual=0;}
+   var fur=JSON.parse(localStorage.getItem(key+"-fur")||"null");if(fur&&fur.packageId===p.id){fur.rows=rows(fur.rows,true);fur.guests=220;fur.price=3700;localStorage.setItem(key+"-fur",JSON.stringify(fur));}
+   var ov=JSON.parse(localStorage.getItem("rizzw-price-overrides")||"{}");ov[p.id]=3700;localStorage.setItem("rizzw-price-overrides",JSON.stringify(ov));localStorage.setItem(flag,"1");
+  }
+  if(state)localStorage.setItem(key,JSON.stringify(state));
+ }catch(e){}
+})();
 // Добавляем новую позицию в открытый расчёт этого пакета, сохраняя остальные правки.
 // Сохранённые исторические банкеты не меняем. После ручного удаления повторно не добавляем.
 try {

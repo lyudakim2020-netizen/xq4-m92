@@ -63,7 +63,7 @@ const A = [["Смета банкета" + (B.client ? " — " + B.client : "")],
 ["Раздел", "Блюдо", "На гостя", "Ед.", "Всего на банкет", "Ед."]];
 B.rows.forEach(r => { if (r.removed) return; const d = dishById(r.dish), pcs = d && d.unit === "шт", liq = d && d.unit === "л";
 const per = pcs ? num(r.pcs) : num(r.g);
-A.push([r.sec, r.title, fin(per) ? per : "", pcs ? "шт" : liq ? "мл" : "г", c.G > 0 && fin(per) ? r2(pcs ? per * c.G : per * c.G / 1000) : "", pcs ? "шт" : liq ? "л" : "кг"]); });
+A.push([r.sec, r.title, fin(per) ? per : "", pcs ? "шт" : liq ? "мл" : "г", c.G > 0 && fin(per) ? r2(pcs ? per * menuRowGuests(r,c.G) : per * menuRowGuests(r,c.G) / 1000) : "", pcs ? "шт" : liq ? "л" : "кг"]); });
 A.push([]);
 A.push(["", "Меню на гостя, ₽", r2(c.perGuest)]);
 if (c.use > 0) A.push(["", "в т.ч. доплата за изменения меню, ₽", r2(c.use)]);
@@ -87,6 +87,12 @@ toast("Смета для гостя сохранена в Excel");
 }
 function internalXlsx() { // для нас: смета + себестоимость
 const c = calc(), wb = XLSX.utils.book_new();
+if(c.batchMode && window.rzExport){
+ const m=rzExport.model("banq"),rows=[["Внутренний расчёт", "В среднем на участника, ₽", "На мероприятие, ₽"]];
+ rzExport.internalRows(m).forEach(r=>rows.push(r.section?[r.section]:[r.name,r2(r.per),r2(r.total)]));
+ XLSX.utils.book_append_sheet(wb,rzGuestSheet("banq"),"Смета");XLSX.utils.book_append_sheet(wb,xSheet(rows,[66,24,25]),"Себестоимость");
+ XLSX.writeFile(wb,`Расчёт_для_нас_${fileSafe(B.client||"банкет")}_${B.date||today()}.xlsx`);return;
+}
 XLSX.utils.book_append_sheet(wb, window.rzGuestSheet && XLSX.style_version ? rzGuestSheet("banq") : xSheet(banqGuestRows(c), [16, 46, 12, 6, 16, 6]), "Смета");
 const S = [["Блюдо", "Блюдо в Айко", "Себестоимость на гостя, ₽", "Разница к пакету, ₽", "Изменение"]];
 B.rows.forEach((r, i) => { const s = c.rs[i], d = dishById(r.dish);
@@ -112,7 +118,7 @@ XLSX.utils.book_append_sheet(wb, xSheet(sum, [30, 16, 22, 10, 10, 50]), "Сво�
 DB.packages.forEach(p => { const s = pkgStats(p);
 const R = [[p.name + " — " + fm(p.price) + " ₽ на гостя"], [], ["Раздел", "Название в меню", "Блюдо в Айко", "г/мл на гостя", "шт на гостя", "Себестоимость за ед., ₽", "Ед.", "Себестоимость на гостя, ₽", "Доля"]];
 p.lines.forEach(l => { const d = dishById(l.dish), c = lineCost(l.dish, l.g, l.pcs);
-R.push([l.sec, l.title, d ? d.name : "", fin(l.g) ? l.g : "", fin(l.pcs) ? l.pcs : "", d && fin(d.cost) ? d.cost : "нет цены", d ? d.unit : "", r2(c), s.cost > 0 && fin(c) ? pc1(c / s.cost) : ""]); });
+R.push([(l.batch?menuBatchTitle(l)+" — ":"")+l.sec, l.title, d ? d.name : "", fin(l.g) ? l.g : "", fin(l.pcs) ? l.pcs : "", d && fin(d.cost) ? d.cost : "нет цены", d ? d.unit : "", r2(c*(p.batchPlan?menuRowGuests(l,p.orderGuests)/p.orderGuests:1)), s.cost > 0 && fin(c) ? pc1(c*(p.batchPlan?menuRowGuests(l,p.orderGuests)/p.orderGuests:1) / s.cost) : ""]); });
 R.push([], ["", "Итого себестоимость на гостя, ₽", "", "", "", "", "", r2(s.cost)], ["", "Фудкост", "", "", "", "", "", pc1(s.fc)]);
 XLSX.utils.book_append_sheet(wb, xSheet(R, [16, 44, 44, 12, 10, 18, 6, 20, 8]), safeName(p.name)); });
 const D = [["Блюдо (как в Айко)", "Группа", "Ед.", "Себестоимость за ед., ₽", "Цена со * в Айко"]];
@@ -209,7 +215,7 @@ try { FS = JSON.parse(localStorage.getItem(FKEY) || "null"); } catch (e) {}
 if (!FS || !Array.isArray(FS.rows)) FS = { client: "", date: "", guests: 50, rows: furAllRows(), price: NaN, budget: NaN, svcOn: true };
 const fsave = () => { try { localStorage.setItem(FKEY, JSON.stringify(FS)); } catch (e) {} };
 const fUnit = d => d && d.unit === "шт" ? "шт" : d && d.unit === "л" ? "мл" : "г";
-const fRowCost = r => lineCost(r.dish, r.qty, r.qty);
+const fRowCost = r => lineCost(r.dish, r.qty, r.qty) * (num(FS.guests)>0 ? menuRowGuests(r,num(FS.guests))/num(FS.guests) : 0);
 
 function furRender() {
 fillDishList();
@@ -218,9 +224,9 @@ $("fClient").value = FS.client || ""; $("fDate").value = FS.date || ""; $("fGues
 $("fPrice").value = fin(num(FS.price)) ? FS.price : ""; $("fBudget").value = fin(num(FS.budget)) ? FS.budget : ""; $("fSvcOn").checked = !!FS.svcOn;
 ["furTarget", "furFloor", "furMin"].forEach(k => { const el = document.querySelector(`[data-fs="${k}"]`); el.value = fin(num(DB.settings[k])) && num(DB.settings[k]) > 0 ? DB.settings[k] : ""; });
 $("fBody").innerHTML = FS.rows.map((r, i) => { const d = dishById(r.dish);
-return `<tr data-f="${i}">
+return `${r.batch && (i===0 || FS.rows[i-1].batch!==r.batch)?`<tr class="sec"><td colspan="5"><b data-fbatch-title="${r.batch}">${esc(menuBatchTitle(r))}</b> <label class="int">Готовим на <input type="number" min="0" step="1" data-fbatch="${r.batch}" value="${r.servings}" style="width:85px" aria-label="Количество гостей: ${esc(r.batchLabel)}"> гостей</label></td></tr>`:""}<tr data-f="${i}">
 <td><input class="dsel" list="dishList" data-k="dish" value="${esc(r.title)}" aria-label="Позиция" style="background:transparent;border-color:transparent;font-weight:500"><div class="aiko"><span data-o="chips"></span> <span class="int" data-o="aiko"></span></div></td>
-<td class="r"><div class="qty"><input class="num" data-k="qty" inputmode="decimal" value="${fin(num(r.qty)) ? r.qty : ""}" aria-label="Количество на гостя"><span>${fUnit(d)}</span></div></td>
+<td class="r"><div class="qty"><input class="num" data-k="qty" inputmode="decimal" value="${fin(num(r.qty)) ? (r.batch?Number(num(r.qty).toFixed(2)):r.qty) : ""}" aria-label="Количество на гостя"><span>${fUnit(d)}</span></div></td>
 <td class="r v" data-o="tot"></td>
 <td class="r v int" data-o="cost"></td>
 <td class="r"><button type="button" class="icon" data-act="del" aria-label="Убрать позицию">✕</button></td></tr>`; }).join("") || `<tr><td colspan="5" class="muted">Добавьте позиции фуршета.</td></tr>`;
@@ -230,12 +236,14 @@ $("fPackage").addEventListener("change", function () {
   const p = DB.packages.find(x => x.id === this.value && x.buffet);
   if (!p) return;
   FS.packageId = p.id;
-  FS.rows = p.lines.map(l => ({ dish: l.dish, title: l.title, qty: dishById(l.dish)?.unit === "шт" ? l.pcs : l.g }));
+  FS.rows = p.lines.map(l => ({ dish: l.dish, title: l.title, batch:l.batch,batchLabel:l.batchLabel,servings:l.servings, qty: dishById(l.dish)?.unit === "шт" ? l.pcs : l.g }));
   FS.price = p.price > 0 ? p.price : NaN;
+  if(p.orderGuests)FS.guests=p.orderGuests;
   fsave(); furRender();
 });
 function furCalc() {
 const G = num(FS.guests), S = DB.settings;
+document.querySelectorAll("[data-fbatch-title]").forEach(el=>{const r=FS.rows.find(r=>r.batch===el.dataset.fbatchTitle);if(r)el.textContent=menuBatchTitle(r);});
 const beer = beerCalc(FS);
 const T = (num(S.furTarget) || 16) / 100, FL = (num(S.furFloor) || 17) / 100, M = num(S.furMin) > 0 ? num(S.furMin) : 0;
 const R = Math.max(1, num(S.roundTo) || 50), up = v => Math.ceil(v / R - 1e-9) * R;
@@ -251,7 +259,7 @@ if (d && d.unitGuess) chips += `<span class="chip warn int">проверьте �
 tr.querySelector('[data-o="chips"]').innerHTML = chips;
 tr.querySelector('[data-o="aiko"]').textContent = d ? `Айко: ${d.name}${fin(d.cost) ? " · " + fm(d.cost, 2) + " ₽/" + d.unit : ""}` : "";
 tr.querySelector('[data-o="cost"]').textContent = fm(c, 2);
-tr.querySelector('[data-o="tot"]').textContent = G > 0 && fin(q) ? (d && d.unit === "шт" ? fm(q * G) + " шт" : fm(q * G / 1000, 2) + (d && d.unit === "л" ? " л" : " кг")) : "";
+tr.querySelector('[data-o="tot"]').textContent = G > 0 && fin(q) ? (d && d.unit === "шт" ? fm(q * menuRowGuests(r,G)) + " шт" : fm(q * menuRowGuests(r,G) / 1000, 2) + (d && d.unit === "л" ? " л" : " кг")) : "";
 });
 const suppliesPer = suppliesCost(FS), foodPer = C - suppliesPer;
 $("fCostTot").textContent = fm(foodPer, 2);
@@ -315,7 +323,7 @@ $("fPrice").addEventListener("input", e => { FS.price = num(e.target.value); fur
 $("fBudget").addEventListener("input", e => { FS.budget = num(e.target.value); furCalc(); });
 $("fSvcOn").addEventListener("change", e => { FS.svcOn = e.target.checked; furCalc(); });
 document.querySelectorAll("[data-fs]").forEach(el => el.addEventListener("input", e => { DB.settings[e.target.dataset.fs] = num(e.target.value); furCalc(); }));
-$("fBody").addEventListener("input", e => { const tr = e.target.closest("tr[data-f]"); if (!tr || e.target.dataset.k !== "qty") return; FS.rows[+tr.dataset.f].qty = num(e.target.value); furCalc(); });
+$("fBody").addEventListener("input", e => { if(e.target.dataset.fbatch){FS.rows.filter(r=>r.batch===e.target.dataset.fbatch).forEach(r=>r.servings=Math.max(0,num(e.target.value)||0));furCalc();return;} const tr = e.target.closest("tr[data-f]"); if (!tr || e.target.dataset.k !== "qty") return; FS.rows[+tr.dataset.f].qty = num(e.target.value); furCalc(); });
 $("fBody").addEventListener("change", e => {
 const tr = e.target.closest("tr[data-f]"); if (!tr || e.target.dataset.k !== "dish") return;
 const r = FS.rows[+tr.dataset.f], d = findDish(e.target.value.trim());
@@ -332,7 +340,7 @@ $("fExample").onclick = () => { FS.rows = furExampleRows(); furRender(); toast("
 function furGuestRows(c) {
 const A = [["Фуршет" + (FS.client ? " — " + FS.client : "")], ["Дата мероприятия", c.dt ? fmtD(c.dt) : ""], ["Гостей", fin(c.G) ? c.G : ""], [], ["Позиция", "На гостя", "Ед.", "Всего", "Ед."]];
 FS.rows.forEach(r => { const d = dishById(r.dish), q = num(r.qty), pcs = d && d.unit === "шт", liq = d && d.unit === "л";
-A.push([r.title, fin(q) ? q : "", pcs ? "шт" : liq ? "мл" : "г", c.G > 0 && fin(q) ? r2(pcs ? q * c.G : q * c.G / 1000) : "", pcs ? "шт" : liq ? "л" : "кг"]); });
+A.push([r.title, fin(q) ? q : "", pcs ? "шт" : liq ? "мл" : "г", c.G > 0 && fin(q) ? r2(pcs ? q * menuRowGuests(r,c.G) : q * menuRowGuests(r,c.G) / 1000) : "", pcs ? "шт" : liq ? "л" : "кг"]); });
 A.push([], ["Цена на гостя, ₽", r2(c.price)], ["Фуршет всего, ₽", r2(c.menu)]);
 if (FS.svcOn) A.push(["Обслуживание " + fm(c.svcPct * 100) + "%, ₽", r2(c.svc)]);
 if(c.beer.qty>0) A.push([beerGuestLine(c.beer),r2(c.beer.revenue)]);
@@ -341,8 +349,8 @@ if (c.dt) A.push(["Оплатить остаток до", fmtD(minusDays(c.dt, n
 return A;
 }
 function furText() {
-const c = furCalc(), L = [`Фуршет${FS.client ? " — " + FS.client : ""}${c.dt ? ", " + fmtD(c.dt) : ""}`, `Гостей: ${fm(c.G)}`, "", "Набор на гостя:"];
-FS.rows.forEach(r => { const d = dishById(r.dish); L.push(`• ${r.title} — ${fm(num(r.qty), Number.isInteger(num(r.qty)) ? 0 : 2)} ${fUnit(d)}`); });
+const c = furCalc(), L = [`Фуршет${FS.client ? " — " + FS.client : ""}${c.dt ? ", " + fmtD(c.dt) : ""}`, `Гостей: ${fm(c.G)}`, "", FS.rows.some(r=>r.batch)?"Объёмы приготовления по заказам:":"Набор на гостя:"];
+FS.rows.forEach(r => { const d = dishById(r.dish); L.push(`• ${r.batch?menuBatchTitle(r)+": ":""}${r.title} — ${r.batch?fm(num(r.qty)*menuRowGuests(r,c.G)/(d?.unit==="шт"?1:1000),2):fm(num(r.qty),2)} ${r.batch?(d?.unit==="шт"?"шт":d?.unit==="л"?"л":"кг"):fUnit(d)}`); });
 L.push("", `Цена на гостя: ${rub(c.price)}`, `Фуршет: ${rub(c.menu)}`);
 if (FS.svcOn) L.push(`Обслуживание ${fm(c.svcPct * 100)}%: ${rub(c.svc)}`);
 if(c.beer.qty>0) L.push(beerGuestLine(c.beer));
@@ -353,6 +361,13 @@ $("fXls").onclick = () => loadXLSX(() => { const c = furCalc(), wb = XLSX.utils.
 XLSX.utils.book_append_sheet(wb, xSheet(furGuestRows(c), [48, 12, 6, 12, 6]), "Фуршет");
 XLSX.writeFile(wb, `Фуршет_${fileSafe(FS.client || "смета")}_${FS.date || today()}.xlsx`); toast("Смета фуршета сохранена в Excel"); });
 $("fXlsInt").onclick = () => loadXLSX(() => { const c = furCalc(), wb = XLSX.utils.book_new();
+if(FS.rows.some(r=>r.batch) && window.rzExport){
+ const m=rzExport.model("fur"),rows=[["Внутренний расчёт", "В среднем на участника, ₽", "На мероприятие, ₽"]];
+ rzExport.internalRows(m).forEach(r=>rows.push(r.section?[r.section]:[r.name,r2(r.per),r2(r.total)]));
+ XLSX.utils.book_append_sheet(wb,rzGuestSheet("fur"),"Смета");XLSX.utils.book_append_sheet(wb,xSheet(rows,[66,24,25]),"Себестоимость");
+ XLSX.writeFile(wb,`Фуршет_для_нас_${fileSafe(FS.client||"смета")}_${FS.date||today()}.xlsx`);return;
+}
+
 XLSX.utils.book_append_sheet(wb, window.rzGuestSheet && XLSX.style_version ? rzGuestSheet("fur") : xSheet(furGuestRows(c), [48, 12, 6, 12, 6]), "Смета");
 const S = [["Позиция", "Позиция в Айко", "На гостя", "Ед.", "Себестоимость за ед., ₽", "Себестоимость на гостя, ₽"]];
 FS.rows.forEach(r => { const d = dishById(r.dish); S.push([r.title, d ? d.name : "", num(r.qty), fUnit(d), d && fin(d.cost) ? d.cost : "нет цены", r2(fRowCost(r))]); });

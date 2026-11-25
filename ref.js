@@ -9,14 +9,14 @@
         var F = c.F, add = 0, rem = 0;
         (c.rs || []).forEach(function (s) {
           s.gst = NaN;
-          if (!s.changed || s.unknown || !(F > 0)) return;
+          if (c.batchMode || !s.changed || s.unknown || !(F > 0)) return;
           var g = s.delta / F;
           if (s.capFrom && fin(c.P) && s.delta > 0) g = Math.min(g, s.capFrom - c.P);
           s.gst = g;
           if (g > 0.005) add += g; else if (g < -0.005) rem += -g;
         });
         c.addG = add; c.remG = rem;
-        var cheaper = c.p && !(c.unknown && c.unknown.length) && c.D < -0.005;
+        var cheaper = !c.batchMode && c.p && !(c.unknown && c.unknown.length) && c.D < -0.005;
         c.safeRed = cheaper ? -c.D : 0;
         c.normRed = cheaper && F > 0 ? -c.D / F : 0;
       } catch (e) {}
@@ -47,7 +47,7 @@
         });
         var box = ensureBox(); if (!box) return c;
         var changed = c.rs.some(function (s) { return s.changed; });
-        box.hidden = !(changed && c.p && c.F > 0);
+        box.hidden = c.batchMode || !(changed && c.p && c.F > 0);
         if (!box.hidden) {
           var G = c.G;
           $("sRefAdd").textContent = c.addG > 0 ? "+" + tot(c.addG, G) : "—";

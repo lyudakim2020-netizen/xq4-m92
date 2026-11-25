@@ -127,6 +127,7 @@
     }
     function menuGroups(pk) {
       var groups = [], idx = {}, mods = S.mods || [];
+      if(pk.batchPlan && S.tb){S.tb.rows.filter(r=>!r.removed).forEach(r=>{var sec=menuBatchTitle(r)+" — "+r.sec,d=dishById(r.dish),n=menuRowGuests(r,num(S.guests)),q=d?.unit==="шт"?fm(r.pcs*n)+" шт":fm(r.g*n/1000,2)+(d?.unit==="л"?" л":" кг");push(sec,r.title+" — "+q);});return groups;}
       function push(sec, text) {
         if (!(sec in idx)) { idx[sec] = groups.length; groups.push({ sec: sec, items: [] }); }
         groups[idx[sec]].items.push(text);
@@ -146,7 +147,7 @@
       d.meta.push("Гостей: " + (fin(c.G) ? fm(c.G) : "—"));
       if (c.pk) {
         d.lines.push({ name: "Меню «" + c.pk.name + "»", qty: c.G > 0 ? fm(c.G) : "", price: c.P, sum: c.menu, plain: "Меню «" + c.pk.name + "»" + (c.G > 0 ? ", " + fm(c.G) + " гостей" : "") });
-        d.menuTitle = "Состав меню «" + c.pk.name + "» (на одного гостя)";
+        d.menuTitle = "Состав меню «" + c.pk.name + (c.pk.batchPlan?"» (всего на стол)":"» (на одного гостя)");
         if (o.menu) d.groups = menuGroups(c.pk);
       }
       if (S.svcOn) { var sn = "Обслуживание " + fm(c.sp * 100) + "%"; d.lines.push({ name: sn, qty: "", price: NaN, sum: c.svc, plain: sn }); }
@@ -540,8 +541,9 @@ body.tab-tk .mbar{display:none!important}
     function renderMenuBox() {
       var tb = ensureTb(), body = $("tkMenuBody");
       if (!tb) { body.innerHTML = '<tr><td colspan="4" class="muted">Нет пакета меню с ценой.</td></tr>'; return; }
-      var h = "", last = null;
+      var h = "", last = null, batch=null;
       tb.rows.forEach(function (r, i) {
+        if(r.batch && batch!==r.batch){h+='<tr class="sec"><td colspan="4">'+esc(menuBatchTitle(r))+"</td></tr>";batch=r.batch;last=null;}
         if (r.sec !== last) { h += '<tr class="sec"><td colspan="4">' + esc(r.sec) + "</td></tr>"; last = r.sec; }
         var d = dishById(r.dish), isPcs = d && d.unit === "шт";
         var q = isPcs

@@ -37,11 +37,11 @@ function normDB(d) {
 }
 function newBanquet(pkgId) {
 const p = DB.packages.find(x => x.id === pkgId) || DB.packages[0];
-return { id: null, client: "", date: "", guests: 30, pkg: p ? p.id : null, rows: p ? rowsFromPkg(p) : [],
+return { id: null, client: "", date: "", guests: p?.orderGuests || 30, pkg: p ? p.id : null, rows: p ? rowsFromPkg(p) : [],
 svc: {}, custom: [], svcOn: true, disc: NaN, manual: NaN };
 }
 function rowsFromPkg(p) {
-return p.lines.map(l => ({ sec: l.sec, title: l.title, base: { dish: l.dish, g: l.g, pcs: l.pcs }, dish: l.dish, g: l.g, pcs: l.pcs, removed: false }));
+return p.lines.map(l => ({ sec: l.sec, title: l.title, batch: l.batch, batchLabel: l.batchLabel, servings: l.servings, base: { dish: l.dish, g: l.g, pcs: l.pcs }, dish: l.dish, g: l.g, pcs: l.pcs, removed: false }));
 }
 function exampleBanquet() { // пример: замена горячего у Кости
 const b = newBanquet("p1"); b.client = "Костя (пример)"; b.date = "2026-12-17"; b.guests = 30; b.manual = 300;
@@ -106,10 +106,12 @@ return {qty,litres,revenue:qty*BEER.price,cost:litres*BEER.costPerLitre};
 function beerGuestLine(beer) {
 return `${BEER.name}, ${BEER.portionMl} мл: ${fm(beer.qty)} порц. × ${fm(BEER.price)} ₽ = ${rub(beer.revenue)}`;
 }
+function menuRowGuests(r, G) { return fin(num(r.servings)) ? Math.max(0,num(r.servings)) : G; }
+function menuBatchTitle(r) { return r.batch ? `${r.batchLabel} · ${fm(num(r.servings))} гостей` : ""; }
 function pkgStats(p) {
 let c = 0, miss = [], star = [], chk = [];
 p.lines.forEach(l => { const v = lineCost(l.dish, l.g, l.pcs); const d = dishById(l.dish);
-if (fin(v)) c += v; else miss.push(l.title);
+if (fin(v)) c += v * (p.batchPlan ? menuRowGuests(l,p.orderGuests)/p.orderGuests : 1); else miss.push(l.title);
 if (d && d.star) star.push(l.title); if (l.check) chk.push(l.title); });
 return { cost: c, fc: p.price > 0 ? c / p.price : NaN, miss, star, chk };
 }
@@ -137,7 +139,7 @@ const F = st.fc;
 let dS = 0, dO = 0, capP = NaN, unknown = [], curCost = 0;
 const rs = B.rows.map(r => {
 const s = rowState(r);
-if (fin(s.cur)) curCost += s.cur;
+if (fin(s.cur)) curCost += s.cur * (G > 0 ? menuRowGuests(r,G)/G : 0);
 if (s.unknown) unknown.push(r.title);
 if (s.changed && !s.unknown) {
 const sp = s.swapped ? srcPrice(r.dish) : NaN;
@@ -160,7 +162,9 @@ else rec = up(Math.max((dS + dO) / F, D));
 if (capped) why = "Норма по заменам выше разницы цен пакетов, поэтому замены считаем по потолку: гость платит как за пакет, из которого блюдо." + (dO > 0 ? " Остальные изменения — по норме." : "");
 else why = "Норма: разница себестоимости ÷ фудкост пакета, округлено вверх до " + fm(R) + " ₽. Наценка пакета сохраняется.";
 }
-const man = num(B.manual), use = fin(man) ? man : rec;
+const batchMode = B.rows.some(r=>r.batch);
+if(batchMode){rec=0;why="Цена за гостя фиксирована. Основной заказ и дозаказ считаются по своим объёмам.";}
+const man = num(B.manual), use = batchMode ? 0 : fin(man) ? man : rec;
 const perGuest = fin(P) ? P + (fin(use) ? use : 0) : NaN;
 const menu = fin(perGuest) && G > 0 ? perGuest * G : NaN;
 const disc = fin(num(B.disc)) ? num(B.disc) / 100 : 0;
@@ -179,7 +183,7 @@ const suppliesTotal = G > 0 ? internalCostPerGuest * G : NaN;
 const foodCost = G > 0 ? foodOnlyCost + suppliesTotal + beer.cost : NaN;
 const directRevenue = (fin(menuD) ? menuD : 0) + beer.revenue;
 return { p, P, G, st, F, rs, dS, dO, D, min, nrm, cap, rec, why, man, use, perGuest, menu, disc, menuD, svc, svcPct, svcs, total, pre,
-foodCost, foodOnlyCost, suppliesTotal, internalCostPerGuest, beer, directRevenue, fcFood: menuD > 0 ? foodOnlyCost / menuD : NaN, fcB: directRevenue > 0 ? foodCost / directRevenue : NaN, gp: fin(menuD) ? directRevenue - foodCost : NaN, unknown };
+batchMode, foodCost, foodOnlyCost, suppliesTotal, internalCostPerGuest, beer, directRevenue, fcFood: menuD > 0 ? foodOnlyCost / menuD : NaN, fcB: directRevenue > 0 ? foodCost / directRevenue : NaN, gp: fin(menuD) ? directRevenue - foodCost : NaN, unknown };
 }
 /* ---------- даты ---------- */
 const parseD = s => { if (!s) return null; const [y, m, d] = s.split("-").map(Number); return new Date(y, m - 1, d); };
@@ -207,14 +211,15 @@ renderMenu(); renderSvc(); recalc();
 window.renderWaiterMemo?.();
 }
 function renderMenu() {
-let html = "", last = null;
+let html = "", last = null, batch = null;
 B.rows.forEach((r, i) => {
+if(r.batch && r.batch!==batch){html+=`<tr class="sec"><td colspan="5"><b data-batch-title="${esc(r.batch)}">${esc(menuBatchTitle(r))}</b> <label class="int" style="margin-left:12px">Готовим на <input type="number" min="0" step="1" data-batch="${esc(r.batch)}" value="${num(r.servings)}" aria-label="Количество гостей: ${esc(r.batchLabel)}" style="width:85px"> гостей</label></td></tr>`;batch=r.batch;last=null;}
 if (r.sec !== last) { html += `<tr class="sec"><td colspan="5">${esc(r.sec)}</td></tr>`; last = r.sec; }
 const d = dishById(r.dish);
 const isPcs = d && d.unit === "шт";
 const q = isPcs
 ? `<div class="qty"><input class="num" data-k="pcs" inputmode="decimal" value="${fin(r.pcs) ? r.pcs : ""}" aria-label="Штук на гостя"><span>шт</span></div>`
-: `<div class="qty"><input class="num" data-k="g" inputmode="decimal" value="${fin(r.g) ? r.g : ""}" aria-label="Граммов на гостя"><span>${d && d.unit === "л" ? "мл" : "г"}</span></div>`;
+: `<div class="qty"><input class="num" data-k="g" inputmode="decimal" value="${fin(r.g) ? (r.batch?Number(r.g.toFixed(2)):r.g) : ""}" aria-label="Граммов на гостя"><span>${d && d.unit === "л" ? "мл" : "г"}</span></div>`;
 html += `<tr data-i="${i}">
 <td><input class="dsel" list="dishList" data-k="dish" value="${esc(r.title)}" aria-label="Блюдо"><div class="aiko"><span data-o="chips"></span> <span class="int" data-o="aiko"></span></div></td>
 <td class="r">${q}</td>
@@ -270,12 +275,18 @@ del.className = "r v int " + (s.delta > 0 ? "pos" : s.delta < 0 ? "neg" : "");
 [...$("svcBody").querySelectorAll("tr[data-c]")].forEach(tr => { const x = B.custom[+tr.dataset.c]; const v = num(x.price) * num(x.qty); tr.querySelector('[data-o="sum"]').textContent = fin(v) ? fm(v) : ""; });
 $("svcTot").textContent = fm(c.svcs);
 // сводка
+let batchSummary=$("batchCostSummary");
+if(!batchSummary){$("pkgNote").insertAdjacentHTML("afterend",'<div class="int" id="batchCostSummary"></div>');batchSummary=$("batchCostSummary");}
+batchSummary.hidden=!c.batchMode;
+document.querySelectorAll("[data-batch-title]").forEach(el=>{const r=B.rows.find(r=>r.batch===el.dataset.batchTitle);if(r)el.textContent=menuBatchTitle(r);});
+if(c.batchMode){batchSummary.innerHTML=[...new Set(B.rows.filter(r=>r.batch).map(r=>r.batch))].map(batch=>{const rows=B.rows.filter(r=>r.batch===batch),total=rows.reduce((a,r)=>a+(r.removed?0:lineCost(r.dish,r.g,r.pcs)*menuRowGuests(r,c.G)),0);return `<div class="kv"><span>${esc(menuBatchTitle(rows[0]))}</span><b>${rub(total,2)}</b></div>`;}).join("")+`<p class="small">Итого еда: ${rub(c.foodOnlyCost,2)} · в среднем ${rub(c.foodOnlyCost/c.G,2)} на участника. Изменение общего числа гостей не меняет объёмы этих заказов.</p>`;}
 $("pkgNote").textContent = c.p ? `${c.p.note || ""} Цена ${fm(c.P)} ₽ на гостя.` : "";
 $("hdrSub").textContent = `Цены Айко на ${fmtD(parseD(DB.pricesDate))}`;
 $("sRec").textContent = rub(c.rec);
 $("sRecTot").textContent = fin(c.rec) && c.G > 0 ? `× ${fm(c.G)} гостей = ${rub(c.rec * c.G)}` : "";
 $("sWhy").textContent = c.why;
-$("sC0").textContent = rub(c.st.cost, 2); $("sF").textContent = pct(c.F); $("sD").textContent = sgn(c.D) + " ₽";
+$("sC0").previousElementSibling.textContent=c.batchMode?"Средняя себестоимость еды на участника":"Себестоимость пакета на гостя";
+$("sC0").textContent = rub(c.batchMode && c.G>0 ? c.foodOnlyCost/c.G : c.st.cost, 2); $("sF").textContent = pct(c.batchMode ? c.fcFood : c.F); $("sD").textContent = sgn(c.D) + " ₽";
 $("sMin").textContent = rub(c.min); $("sNorm").textContent = rub(c.nrm); $("sCap").textContent = fin(c.cap) ? rub(c.cap) : "нет (блюда не из дорогого пакета)";
 const mn = $("sManualNote");
 if (fin(c.man)) { mn.hidden = false;
@@ -318,12 +329,12 @@ if (fw > 0 && c.fcB > fw) w.push(`<p class="note warn">Доля прямых з�
 $("iWarn").innerHTML = w.join(""); $("iWarn").hidden = !w.length;
 // кухня
 const kit = {};
-B.rows.forEach(r => { if (r.removed) return; const d = dishById(r.dish); const k = r.dish || r.title;
-kit[k] = kit[k] || { name: d ? d.name : r.title, unit: d ? d.unit : "кг", g: 0, pcs: 0 };
+B.rows.forEach(r => { if (r.removed) return; const d = dishById(r.dish); const k = (r.batch || "") + (r.dish || r.title);
+kit[k] = kit[k] || { name: (r.batch ? menuBatchTitle(r)+" — " : "") + (d ? d.name : r.title), unit: d ? d.unit : "кг", g: 0, pcs: 0, servings: menuRowGuests(r,c.G) };
 kit[k].g += num(r.g) || 0; kit[k].pcs += num(r.pcs) || 0; });
 $("kitBody").innerHTML = Object.values(kit).map(k => k.unit === "шт"
-? `<tr><td>${esc(k.name)}</td><td class="r v">${fm(k.pcs, Number.isInteger(k.pcs) ? 0 : 2)} шт</td><td class="r v">${c.G > 0 ? fm(k.pcs * c.G) + " шт" : "—"}</td></tr>`
-: `<tr><td>${esc(k.name)}</td><td class="r v">${fm(k.g, Number.isInteger(k.g) ? 0 : 2)} ${k.unit === "л" ? "мл" : "г"}</td><td class="r v">${c.G > 0 ? fm(k.g * c.G / 1000, 2) + (k.unit === "л" ? " л" : " кг") : "—"}</td></tr>`).join("");
+? `<tr><td>${esc(k.name)}</td><td class="r v">${fm(k.pcs, Number.isInteger(k.pcs) ? 0 : 2)} шт</td><td class="r v">${c.G > 0 ? fm(k.pcs * k.servings) + " шт" : "—"}</td></tr>`
+: `<tr><td>${esc(k.name)}</td><td class="r v">${fm(k.g, Number.isInteger(k.g) ? 0 : 2)} ${k.unit === "л" ? "мл" : "г"}</td><td class="r v">${c.G > 0 ? fm(k.g * k.servings / 1000, 2) + (k.unit === "л" ? " л" : " кг") : "—"}</td></tr>`).join("");
 save();
 return c;
 }
@@ -336,10 +347,11 @@ $("bDisc").addEventListener("input", e => { B.disc = num(e.target.value); recalc
 $("bSvcOn").addEventListener("change", e => { B.svcOn = e.target.checked; recalc(); });
 $("bPkg").addEventListener("change", e => {
 const changed = B.rows.some(r => rowState(r).changed);
-B.pkg = e.target.value; const p = DB.packages.find(x => x.id === B.pkg); B.rows = rowsFromPkg(p); B.manual = NaN; $("bManual").value = "";
+B.pkg = e.target.value; const p = DB.packages.find(x => x.id === B.pkg); B.rows = rowsFromPkg(p); if(p.orderGuests){B.guests=p.orderGuests;$("bGuests").value=B.guests;} B.manual = NaN; $("bManual").value = "";
 renderMenu(); recalc(); if (changed) toast("Меню заменено на состав выбранного пакета");
 });
 $("menuBody").addEventListener("input", e => {
+if(e.target.dataset.batch){const n=Math.max(0,num(e.target.value)||0);B.rows.filter(r=>r.batch===e.target.dataset.batch).forEach(r=>r.servings=n);recalc();return;}
 const tr = e.target.closest("tr[data-i]"); if (!tr) return; const r = B.rows[+tr.dataset.i], k = e.target.dataset.k;
 if (k === "g" || k === "pcs") { r[k] = num(e.target.value); if (!fin(r[k])) r[k] = 0; recalc(); }
 });
@@ -388,7 +400,7 @@ L.push(`Смета банкета${B.client ? " — " + B.client : ""}${B.date ?
 L.push(`Пакет «${c.p ? c.p.name : ""}», гостей: ${fm(c.G)}`); L.push("");
 let last = null;
 B.rows.forEach(r => { if (r.removed) return; if (r.sec !== last) { L.push(r.sec + ":"); last = r.sec; }
-const d = dishById(r.dish); L.push(`• ${r.title} — ${d && d.unit === "шт" ? fm(r.pcs, Number.isInteger(r.pcs) ? 0 : 2) + " шт" : fm(r.g, Number.isInteger(r.g) ? 0 : 2) + (d && d.unit === "л" ? " мл" : " г")}`); });
+const d = dishById(r.dish); L.push(`• ${r.batch ? menuBatchTitle(r)+": " : ""}${r.title} — ${d && d.unit === "шт" ? fm(r.pcs*(r.batch?menuRowGuests(r,c.G):1), 2) + " шт" : fm(r.g*(r.batch?menuRowGuests(r,c.G)/1000:1), 2) + (r.batch ? (d && d.unit === "л" ? " л" : " кг") : (d && d.unit === "л" ? " мл" : " г"))}`); });
 L.push("");
 L.push(`Меню: ${fm(c.perGuest)} ₽ × ${fm(c.G)} = ${rub(c.menu)}`);
 if (c.use > 0) L.push(`  в т.ч. доплата за изменения меню: ${rub(c.use)} на гостя`);

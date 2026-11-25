@@ -11,15 +11,15 @@
       var kit = {}, order = [];
       (rows || []).forEach(function (r) {
         if (!r || r.removed) return;
-        var d = r.dish ? dishById(r.dish) : null, k = r.dish || r.title;
+        var d = r.dish ? dishById(r.dish) : null, k = (r.batch||"") + (r.dish || r.title);
         if (!k || (!d && !r.title)) return;
-        if (!kit[k]) { kit[k] = { name: d ? d.name : r.title, unit: d ? d.unit : "кг", g: 0, pcs: 0 }; order.push(k); }
+        if (!kit[k]) { kit[k] = { name: (r.batch?menuBatchTitle(r)+" — ":"")+(d ? d.name : r.title), servings:menuRowGuests(r,G), unit: d ? d.unit : "кг", g: 0, pcs: 0 }; order.push(k); }
         kit[k].g += num(r.g) || 0; kit[k].pcs += num(r.pcs) || 0;
       });
       return order.map(function (k) {
         var x = kit[k];
-        if (x.unit === "шт") return { name: x.name, per: fm(x.pcs, Number.isInteger(x.pcs) ? 0 : 2) + " шт", tot: G > 0 ? fm(x.pcs * G) + " шт" : "—" };
-        return { name: x.name, per: fm(x.g, Number.isInteger(x.g) ? 0 : 2) + (x.unit === "л" ? " мл" : " г"), tot: G > 0 ? fm(x.g * G / 1000, 2) + (x.unit === "л" ? " л" : " кг") : "—" };
+        if (x.unit === "шт") return { name: x.name, per: fm(x.pcs, Number.isInteger(x.pcs) ? 0 : 2) + " шт", tot: G > 0 ? fm(x.pcs * x.servings) + " шт" : "—" };
+        return { name: x.name, per: fm(x.g, Number.isInteger(x.g) ? 0 : 2) + (x.unit === "л" ? " мл" : " г"), tot: G > 0 ? fm(x.g * x.servings / 1000, 2) + (x.unit === "л" ? " л" : " кг") : "—" };
       });
     }
     function tbody(ls) {
@@ -28,7 +28,7 @@
     function docHTML(meta, ls) {
       return '<div class="kitdoc"><h1>Заявка на кухню</h1><p class="kitm">' + meta.parts.map(esc).join("<br>") + "</p>" +
         '<table><thead><tr><th>Блюдо</th><th class="r">На гостя</th><th class="r">Всего</th></tr></thead><tbody>' + tbody(ls) + "</tbody></table>" +
-        '<p class="kitf">Составлено ' + esc(new Date().toLocaleDateString("ru-RU")) + ". Количество на одного гостя умножено на число гостей.</p></div>";
+        '<p class="kitf">Составлено ' + esc(new Date().toLocaleDateString("ru-RU")) + ". Итоги рассчитаны по количеству гостей соответствующего блока меню.</p></div>";
     }
     /* meta: { parts: ["Клиент: …", …], G: гостей, file: "часть имени файла" } */
     function print(meta, ls) {

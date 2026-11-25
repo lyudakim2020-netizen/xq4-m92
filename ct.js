@@ -90,7 +90,7 @@
       var cost = 0, grams = 0, miss = [];
       S.rows.forEach(function (r) {
         var v = lineCost(r.dish, r.g, r.pcs), d = dishById(r.dish);
-        if (fin(v)) cost += v; else miss.push(r.title);
+        if (fin(v)) cost += v * (num(S.guests)>0?menuRowGuests(r,num(S.guests))/num(S.guests):0); else miss.push(r.title);
         if (d && d.unit !== "шт" && d.unit !== "л") grams += num(r.g) || 0;
       });
       var tg = (num(S.target) || 0) / 100;
@@ -203,7 +203,8 @@
     $("ctLoad").addEventListener("click", function () {
       var p = DB.packages.find(function (x) { return x.id === $("ctBase").value; });
       if (!p) { toast("Выберите меню из списка"); return; }
-      S.rows = p.lines.filter(function (l) { return l.dish && dishById(l.dish); }).map(function (l) { return { id: uid("r"), sec: l.sec, title: l.title, dish: l.dish, g: l.g, pcs: l.pcs }; });
+      if(p.orderGuests)S.guests=p.orderGuests;
+      S.rows = p.lines.filter(function (l) { return l.dish && dishById(l.dish); }).map(function (l) { return { id: uid("r"), sec: l.sec, title: l.title, dish: l.dish, g: l.g, pcs: l.pcs, batch:l.batch,batchLabel:l.batchLabel,servings:l.servings }; });
       S.name = p.name + " (своё)"; S.pkgId = null; S.price = null;
       persist(); renderAll(); toast("Состав пакета «" + p.name + "» загружен: меняйте блюда как нужно");
     });
@@ -224,7 +225,8 @@
       if (!p) { p = { id: uid("p"), kind: "custom" }; DB.packages.push(p); S.pkgId = p.id; }
       p.name = (S.name || "").trim() || "Своё меню"; p.price = st.use; p.kind = "custom";
       p.note = "Собрано в конструкторе. Цена и состав можно менять во вкладке «Пакеты».";
-      p.lines = S.rows.map(function (r) { return { sec: r.sec, title: r.title || clean((dishById(r.dish) || {}).name), dish: r.dish, g: r.g, pcs: r.pcs, check: false }; });
+      p.batchPlan=S.rows.some(r=>r.batch);if(p.batchPlan)p.orderGuests=num(S.guests);
+      p.lines = S.rows.map(function (r) { return { sec: r.sec, title: r.title || clean((dishById(r.dish) || {}).name), dish: r.dish, g: r.g, pcs: r.pcs, batch:r.batch,batchLabel:r.batchLabel,servings:r.servings, check: false }; });
       B = newBanquet(p.id); if (num(S.guests) > 0) B.guests = num(S.guests);
       persist(); save(); showTab("banq"); toast("Банкет по меню «" + p.name + "»: " + fm(p.price) + " ₽ на гостя");
     });
