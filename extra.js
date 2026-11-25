@@ -342,7 +342,7 @@ return A;
 }
 function furText() {
 const c = furCalc(), L = [`Фуршет${FS.client ? " — " + FS.client : ""}${c.dt ? ", " + fmtD(c.dt) : ""}`, `Гостей: ${fm(c.G)}`, "", "Набор на гостя:"];
-FS.rows.forEach(r => { const d = dishById(r.dish); L.push(`• ${r.title} — ${fm(num(r.qty))} ${fUnit(d)}`); });
+FS.rows.forEach(r => { const d = dishById(r.dish); L.push(`• ${r.title} — ${fm(num(r.qty), Number.isInteger(num(r.qty)) ? 0 : 2)} ${fUnit(d)}`); });
 L.push("", `Цена на гостя: ${rub(c.price)}`, `Фуршет: ${rub(c.menu)}`);
 if (FS.svcOn) L.push(`Обслуживание ${fm(c.svcPct * 100)}%: ${rub(c.svc)}`);
 if(c.beer.qty>0) L.push(beerGuestLine(c.beer));

@@ -18,8 +18,8 @@
       });
       return order.map(function (k) {
         var x = kit[k];
-        if (x.unit === "шт") return { name: x.name, per: fm(x.pcs, 1) + " шт", tot: G > 0 ? fm(x.pcs * G) + " шт" : "—" };
-        return { name: x.name, per: fm(x.g) + (x.unit === "л" ? " мл" : " г"), tot: G > 0 ? fm(x.g * G / 1000, 2) + (x.unit === "л" ? " л" : " кг") : "—" };
+        if (x.unit === "шт") return { name: x.name, per: fm(x.pcs, Number.isInteger(x.pcs) ? 0 : 2) + " шт", tot: G > 0 ? fm(x.pcs * G) + " шт" : "—" };
+        return { name: x.name, per: fm(x.g, Number.isInteger(x.g) ? 0 : 2) + (x.unit === "л" ? " мл" : " г"), tot: G > 0 ? fm(x.g * G / 1000, 2) + (x.unit === "л" ? " л" : " кг") : "—" };
       });
     }
     function tbody(ls) {

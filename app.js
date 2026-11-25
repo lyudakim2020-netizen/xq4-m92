@@ -319,8 +319,8 @@ B.rows.forEach(r => { if (r.removed) return; const d = dishById(r.dish); const k
 kit[k] = kit[k] || { name: d ? d.name : r.title, unit: d ? d.unit : "кг", g: 0, pcs: 0 };
 kit[k].g += num(r.g) || 0; kit[k].pcs += num(r.pcs) || 0; });
 $("kitBody").innerHTML = Object.values(kit).map(k => k.unit === "шт"
-? `<tr><td>${esc(k.name)}</td><td class="r v">${fm(k.pcs, 1)} шт</td><td class="r v">${c.G > 0 ? fm(k.pcs * c.G) + " шт" : "—"}</td></tr>`
-: `<tr><td>${esc(k.name)}</td><td class="r v">${fm(k.g)} ${k.unit === "л" ? "мл" : "г"}</td><td class="r v">${c.G > 0 ? fm(k.g * c.G / 1000, 2) + (k.unit === "л" ? " л" : " кг") : "—"}</td></tr>`).join("");
+? `<tr><td>${esc(k.name)}</td><td class="r v">${fm(k.pcs, Number.isInteger(k.pcs) ? 0 : 2)} шт</td><td class="r v">${c.G > 0 ? fm(k.pcs * c.G) + " шт" : "—"}</td></tr>`
+: `<tr><td>${esc(k.name)}</td><td class="r v">${fm(k.g, Number.isInteger(k.g) ? 0 : 2)} ${k.unit === "л" ? "мл" : "г"}</td><td class="r v">${c.G > 0 ? fm(k.g * c.G / 1000, 2) + (k.unit === "л" ? " л" : " кг") : "—"}</td></tr>`).join("");
 save();
 return c;
 }
@@ -385,7 +385,7 @@ L.push(`Смета банкета${B.client ? " — " + B.client : ""}${B.date ?
 L.push(`Пакет «${c.p ? c.p.name : ""}», гостей: ${fm(c.G)}`); L.push("");
 let last = null;
 B.rows.forEach(r => { if (r.removed) return; if (r.sec !== last) { L.push(r.sec + ":"); last = r.sec; }
-const d = dishById(r.dish); L.push(`• ${r.title} — ${d && d.unit === "шт" ? fm(r.pcs) + " шт" : fm(r.g) + (d && d.unit === "л" ? " мл" : " г")}`); });
+const d = dishById(r.dish); L.push(`• ${r.title} — ${d && d.unit === "шт" ? fm(r.pcs, Number.isInteger(r.pcs) ? 0 : 2) + " шт" : fm(r.g, Number.isInteger(r.g) ? 0 : 2) + (d && d.unit === "л" ? " мл" : " г")}`); });
 L.push("");
 L.push(`Меню: ${fm(c.perGuest)} ₽ × ${fm(c.G)} = ${rub(c.menu)}`);
 if (c.use > 0) L.push(`  в т.ч. доплата за изменения меню: ${rub(c.use)} на гостя`);
