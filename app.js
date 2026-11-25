@@ -22,6 +22,9 @@ function normDB(d) {
   d.banquets = d.banquets || [];
   d.settings = Object.assign({}, SEED.settings, d.settings || {});
   d.rev = d.rev || SEED.rev;
+  // Новая услуга доступна и в сохранённом справочнике без сброса его ручных цен.
+  const tablecloth = SEED.services.find(s => s.id === "s17-tablecloth");
+  if (tablecloth && !d.services.some(s => s.id === tablecloth.id)) d.services.push(clone(tablecloth));
   // Заполняем пропуски в сохранённом справочнике, сохраняя цены, введённые вручную.
   for (const id of ["d99", "d100", "d101"]) {
     const saved = d.dishes.find(dish => dish.id === id);
